@@ -94,4 +94,4 @@ class GroundTruthExperiment:
             self.save_results(data_name, results, times, start, stop)
 
 experiment = GroundTruthExperiment(model_name, datasets, explanations, estimators, methods)
-experiment.run_experiment(start=0, stop=1)
+experiment.run_experiment(start=0, stop=3)
