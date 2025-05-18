@@ -10,10 +10,11 @@ from openxai.dataloader import ReturnLoaders
 import sage
 import shap
 
-datasets = ['german']
+datasets = ['compas']
 explanations = ["shap", "sage"]
 estimators = ["kernel", "permutation"]
-methods = ["cte", "cte_with_predictions", "cte_stratified"]
+methods = ["cte", "cte_with_predictions", "cte_stratified", "iid"]
+g = [1, 2, 3]
 model_name = 'ann'
 
 class FeatureImportanceExperiment:
@@ -50,22 +51,26 @@ class FeatureImportanceExperiment:
         self.predictions = model.predict(X_test)
         return X_test, y_test, model
 
-    def compress_data(self, X_test, y_test, model, method, repeat):
+    def compress_data(self, X_test, y_test, model, method, repeat, current_g):
         start_time = time.time()
         sigma = np.sqrt(2 * X_test.shape[1])
         if method == "cte":
-            id_compressed = compress.compresspp_kt(X_test, kernel_type=b"gaussian", k_params=np.array([sigma**2]), g=4, seed=repeat)
+            id_compressed = compress.compress_kt(X_test, kernel_type=b"gaussian", k_params=np.array([sigma**2]), g=current_g, seed=repeat)
+            self.curent_size = len(id_compressed)
         elif method == "cte_with_predictions":
             X_test_pred = np.concatenate((X_test, self.predictions), axis=1)
-            id_compressed = compress.compresspp_kt(X_test_pred, kernel_type=b"gaussian", k_params=np.array([np.sqrt(2 * X_test_pred.shape[1])**2]), g=4, seed=repeat) # sigma is updated because of new column
+            id_compressed = compress.compress_kt(X_test_pred, kernel_type=b"gaussian", k_params=np.array([np.sqrt(2 * X_test_pred.shape[1])**2]), g=current_g, seed=repeat) # sigma is updated because of new column
         elif method == "cte_stratified":
             compressed_indices = []
             unique_classes = np.unique(y_test)
             for cls in unique_classes:
                 X_class = X_test[y_test == cls]
-                id_compressed = compress.compresspp_kt(X_class, kernel_type=b"gaussian", k_params=np.array([sigma**2]), g=4, seed=repeat)
+                id_compressed = compress.compress_kt(X_class, kernel_type=b"gaussian", k_params=np.array([sigma**2]), g=current_g, seed=repeat)
                 compressed_indices.extend(np.where(y_test == cls)[0][id_compressed])
             id_compressed = np.array(compressed_indices)
+        elif method == "iid":
+            id_compressed = np.random.choice(X_test.shape[0], size=self.curent_size, replace=False)
+
         end_time_sample_choose = time.time() - start_time
         return X_test[id_compressed], y_test[id_compressed], end_time_sample_choose, id_compressed
 
@@ -87,35 +92,38 @@ class FeatureImportanceExperiment:
     def run_experiment(self, start=0, stop=10):
         for data_name in self.datasets:
             results = {f'{method}_{explanation}_{estimator}': [] for method in self.methods 
-                       for explanation in self.explanations for estimator in self.estimators}
-            times = pd.DataFrame(columns=['dataset', 'repeat', 'method', 'time_explanation', 'time_sample_choose', 'n_original', 'n_sample'])
-            
+                    for explanation in self.explanations for estimator in self.estimators}
             if self.verbose:
                 print(f'==== dataset: {data_name} ====')
             X_test, y_test, model = self.load_data_model(data_name)
-            
-            for repeat in tqdm(range(start, stop)):
-                if self.verbose:
-                    print(f'= repeat: {repeat}')
-                for method in self.methods:
-                    X_compressed, y_compressed, end_time_sample_choose, id_compressed = self.compress_data(X_test, y_test, model, method, repeat)
-                    
-                    for explanation in self.explanations:
-                        for estimator in self.estimators:
-                            exp, end_time_explanation = self.compute_explanations(model, X_test, y_test, X_compressed, explanation, estimator, repeat)
-                            
-                            times = pd.concat([times, pd.DataFrame({
-                                'dataset': [data_name],
-                                'repeat': [repeat],
-                                'method': [f'{method}_{explanation}_{estimator}'], 
-                                'time_explanation': [end_time_explanation],
-                                'time_sample_choose': [end_time_sample_choose], 
-                                'n_original': [X_test.shape[0]],
-                                'n_sample': [len(id_compressed)],
-                            })])
-                            results[f'{method}_{explanation}_{estimator}'].append(exp)
-            
+            times = pd.DataFrame(columns=['dataset', 'repeat', 'method', 'time_explanation', 'time_sample_choose', 'n_original', 'n_sample', 'g'])
+                
+            for current_g in g:
+                print("Current g:", current_g)
+                for repeat in tqdm(range(start, stop)):
+                    if self.verbose:
+                        print(f'= repeat: {repeat}')
+                    for method in self.methods:
+                        X_compressed, y_compressed, end_time_sample_choose, id_compressed = self.compress_data(X_test, y_test, model, method, repeat, current_g)
+                        
+                        for explanation in self.explanations:
+                            for estimator in self.estimators:
+                                print("Computing:", explanation, estimator, method)
+                                exp, end_time_explanation = self.compute_explanations(model, X_test, y_test, X_compressed, explanation, estimator, repeat)
+                                
+                                times = pd.concat([times, pd.DataFrame({
+                                    'dataset': [data_name],
+                                    'repeat': [repeat],
+                                    'method': [f'{method}_{explanation}_{estimator}'], 
+                                    'time_explanation': [end_time_explanation],
+                                    'time_sample_choose': [end_time_sample_choose], 
+                                    'n_original': [X_test.shape[0]],
+                                    'n_sample': [len(id_compressed)],
+                                    'g': [current_g] # influences the size of the samples in a loop
+                                })])
+                                results[f'{method}_{explanation}_{estimator}'].append(exp)
+                
             self.save_results(data_name, results, times, start, stop)
 
 experiment = FeatureImportanceExperiment(model_name, datasets, explanations, estimators, methods)
-experiment.run_experiment(start=0, stop=10)
+experiment.run_experiment(start=0, stop=5)

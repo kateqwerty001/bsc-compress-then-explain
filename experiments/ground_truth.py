@@ -9,7 +9,7 @@ from openxai.dataloader import ReturnLoaders
 import sage
 import shap
 
-datasets = ['gaussian']
+datasets = ['compas']
 explanations = ["sage", "shap"]
 estimators = ["kernel", "permutation"]
 methods = ["ground_truth"]
