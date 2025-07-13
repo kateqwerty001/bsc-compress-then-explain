@@ -3,6 +3,9 @@ import shap
 import numpy as np
 import time
 from goodpoints import compress
+import os
+import numpy as np
+
 
 class PerformSingleExplanation:
     def __init__(self, dataset_name, method, X_test, y_test, model, estimator, explanation, kernel, g, num_bins, seed_compression, seed_explanation, compressed_size):
@@ -71,6 +74,7 @@ class PerformSingleExplanation:
             self.id_compressed = np.arange(self.X_test.shape[0])
         else:
             raise ValueError(f"Unknown method: {self.method}")
+        self.compressed_size = len(self.id_compressed)
         
     def perform_explanation(self):
         self.compress_data()
@@ -79,7 +83,7 @@ class PerformSingleExplanation:
         
         if self.explanation == "shap" and self.estimator == "kernel":
             start_time = time.time()    
-            explainer = shap.KernelExplainer(lambda x: self.model.predict_proba(x)[:, 1], X_background = self.X_compressed, seed=self.seed_explanation)
+            explainer = shap.KernelExplainer(lambda x: self.model.predict_proba(x)[:, 1], self.X_compressed, seed=self.seed_explanation)
             self.explanation_values = explainer(self.X_compressed, silent=True).values
             self.explanation_time = time.time() - start_time
         elif self.explanation == "sage" and self.estimator == "permutation":
@@ -90,4 +94,25 @@ class PerformSingleExplanation:
             self.explanation_time = time.time() - start_time
         else:
             raise ValueError(f"Unknown combination of explanation and estimator: {self.explanation}, {self.estimator}")
+        
+        return {
+            "dataset_name": self.dataset_name,
+            "method": self.method,
+            "estimator": self.estimator,
+            "explanation": self.explanation,
+            "kernel": self.kernel,
+            "g": self.g,
+            "num_bins": self.num_bins,
+            "seed_compression": self.seed_compression,
+            "seed_explanation": self.seed_explanation,
+            "compressed_size": self.compressed_size,
+
+            "id_compressed": self.id_compressed,
+            "original_size": self.original_size,
+            "compression_time": self.compression_time,
+
+            "explanation_values": self.explanation_values,
+            "explanation_time": self.explanation_time
+        }
+
         
