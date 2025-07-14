@@ -1,5 +1,0 @@
-dataset,repeat,method,time_explanation,n_original
-german,0,ground_truth_sage_kernel,206.00403094291687,200
-german,0,ground_truth_sage_permutation,285.4349100589752,200
-german,0,ground_truth_shap_kernel,184.51203298568726,200
-german,0,ground_truth_shap_permutation,8.39732813835144,200

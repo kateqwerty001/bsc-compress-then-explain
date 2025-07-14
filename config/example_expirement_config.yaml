@@ -1,0 +1,36 @@
+experiment_name: compression_vs_explanation
+task: cte_comparison
+dataset: german
+seed: 42
+output_dir: results/compression_vs_explanation/
+
+methods:
+  explainers:
+    - name: shap
+      variant: kernel
+    - name: shap
+      variant: permutation
+    - name: sage
+      variant: kernel
+
+  kernels:
+    - sobolev
+    - gaussian
+    - inverse_multiquadric
+
+  sampling:
+    - iid
+    - compress
+    - stratified
+
+sweep:
+  g:
+    experiment: true
+    values: [1, 2, 4]
+
+  num_bins:
+    experiment: false
+# min
+# max
+
+repeats: 5
