@@ -25,7 +25,8 @@ class PerformSingleExplanation:
         self.original_size = X_test.shape[0]
 
     def _compress_iid(self):
-        self.id_compressed = np.random.choice(self.X_test.shape[0], size=self.compressed_size, replace=False, random_state=self.seed_compression)
+        rng = np.random.default_rng(seed=self.seed_compression) 
+        self.id_compressed = rng.choice(self.X_test.shape[0], size=self.compressed_size, replace=False)
         return
     
     def _compress_cte(self):

@@ -13,10 +13,10 @@ class MetricsCalculator:
         estimators = data["estimator"]
 
         mask = (explanations == 'sage') & (estimators == 'permutation')
-        self.sage_values_gt = data["explanation_values"][mask].mean()
+        self.sage_values_gt = data["explanation_values"][mask].mean(axis=0)
 
         mask = (explanations == 'shap') & (estimators == 'kernel')
-        self.shap_values_gt = data["explanation_values"][mask].mean()
+        self.shap_values_gt = data["explanation_values"][mask].mean(axis=0).mean(axis=0)
 
         experiment_data = np.load(experiment_path, allow_pickle=True)
         self.experiment_values = experiment_data["explanation_values"]
@@ -52,10 +52,11 @@ class MetricsCalculator:
             estimator = self.experiment_estimators[i]
 
             if explainer == "sage" and estimator == "permutation":
-                gt = self.sage_values_gt.reshape(1, -1)
-                exp = exp.reshape(1, -1)
+                gt = self.sage_values_gt
+                exp = exp
             elif explainer == "shap" and estimator == "kernel":
                 gt = self.shap_values_gt
+                exp = exp.mean(axis=0)
             else:
                 raise ValueError(f"Unsupported explanation-estimator combination: {explainer}, {estimator}")
             
@@ -64,7 +65,7 @@ class MetricsCalculator:
             result = {
                 "mae": self._metric_mae(gt, exp),
                 "top_k": self._calculate_top_k(exp, gt, k=k),
-                "mmd": self._calculate_mmd(exp, gt, gamma=gamma)
+                "mmd": self._calculate_mmd(exp.reshape(1, -1), gt.reshape(1, -1), gamma=gamma)
             }
 
             results.append(result)
