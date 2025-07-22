@@ -1,5 +1,6 @@
 from PerformSingleExplanation import PerformSingleExplanation
 import numpy as np
+import pandas as pd
 import os
 
 class GroundTruthExperiment:
@@ -52,6 +53,13 @@ class GroundTruthExperiment:
         os.makedirs(os.path.dirname(dir), exist_ok=True)
         np.savez_compressed(dir, **aggregated)
         print(f"Saved aggregated results to {dir} for {self.dataset_name} with {self.n_repeats} repeats.")
+
+        csv_data = {k: v for k, v in aggregated.items() if (k != 'id_compressed' and k!='explanation_values')}
+        df = pd.DataFrame({k: list(v) for k, v in csv_data.items()})
+        csv_path = dir.replace(".npz", ".csv")
+        df.to_csv(csv_path, index=False)
+
+        print(f"Saved results to {csv_path} for {self.dataset_name} with {self.n_repeats} repeats.")
 
 
 

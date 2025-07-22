@@ -1,1 +1,0 @@
-Testing different g values for German dataset, g from 1 to 3, n_repeats=3

@@ -118,13 +118,16 @@ class ParameterGExperiment:
         df_shap = df[df['explanation'] == 'shap']
         df_sage = df[df['explanation'] == 'sage']
 
-        self.save_chart(df_shap, "mae", "shap")
-        self.save_chart(df_sage, "mae", "sage")
+        for metric in ['mae', 'mmd', 'top_k']:
+            self.save_metric_chart(df_shap, metric, "shap")
+            self.save_metric_chart(df_sage, metric, "sage")
 
-    def save_chart(self, df, y_name, exp_name):
+        df.to_csv(f"metadata/{self.dataset_name}/{self.experiment_name}/changing_g_with_metrics.csv", index=False)
+
+    def save_metric_chart(self, df, y_name, exp_name):
         grouped = df.groupby(["method", "compressed_size"]).agg(
-            mean=("mae", "mean"),
-            std=("mae", "std")
+            mean=(y_name, "mean"),
+            std=(y_name, "std")
         ).reset_index()
 
         colors = {

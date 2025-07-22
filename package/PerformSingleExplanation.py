@@ -90,7 +90,7 @@ class PerformSingleExplanation:
         elif self.explanation == "sage" and self.estimator == "permutation":
             start_time = time.time()
             imputer = sage.MarginalImputer(self.model.predict_proba, self.X_compressed)
-            explainer = sage.PermutationEstimator(imputer, loss="cross entropy", random_state=self.seed_explanation)
+            explainer = sage.PermutationEstimator(imputer, loss="cross entropy", random_state=self.seed_explanation, n_jobs=16)
             self.explanation_values =  explainer(self.X_compressed, self.y_compressed, bar=False, verbose=False).values
             self.explanation_time = time.time() - start_time
         else:
