@@ -28,7 +28,7 @@ for d_name in dataset_names:
         kernel = b"gaussian",
         num_bins = 4, 
         experiment_name="changing_g_num_bins_4_n_repeats_10",
-        description="Testing different g values for German dataset, using num_bins=4 and n_repeats=10",
+        description=f"Testing different g values for {d_name} dataset, using num_bins=4 and n_repeats=10",
     )
 
     changing_g.perform()
