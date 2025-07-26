@@ -8,7 +8,7 @@ from matplotlib.ticker import ScalarFormatter
 import math
 
 class ParameterGExperiment:
-    def __init__(self, experiment_name, description, dataset_name, X_test, y_test, model, n_repeats=3, g_values = None, kernel="gaussian", num_bins=4, ground_truth_path=None):
+    def __init__(self, experiment_name, description, dataset_name, X_test, y_test, model, n_repeats, g_values = None, kernel="gaussian", num_bins=4, ground_truth_path=None):
         self.dataset_name = dataset_name
         self.X_test = X_test
         self.y_test = y_test
@@ -29,7 +29,7 @@ class ParameterGExperiment:
         if self.g_values is None:
             self.g_values = self.possible_g_values()
 
-    def possible_g_values(self, n):
+    def possible_g_values(self):
         x = len(self.X_test) // self.num_bins
         power = 1
         while power * 4 <= x:
@@ -43,13 +43,14 @@ class ParameterGExperiment:
         while  2 ** g*np.sqrt(n_prime * self.num_bins) <= n_prime:
             possible_g.append(g)
             g += 1
-        return reversed(possible_g)
+        return list(reversed(possible_g))
         
     def perform(self):
         all_results = []
         iid_sizes = []
 
         for i in range(self.n_repeats):
+            print("Running for repeat:", i+1, " g_values: ", self.g_values)
             for g in self.g_values:
                 for explanation, esimator in [("shap", "kernel"), ("sage", "permutation")]:
                     for method in ['cte', 'cte_predictions', 'cte_stratified']:
@@ -74,6 +75,8 @@ class ParameterGExperiment:
                         all_results.append(result)
 
                         iid_sizes.append(single_explanation.compressed_size)
+
+        print(len(all_results))
 
         iid_sizes = set(iid_sizes)
         
@@ -110,6 +113,7 @@ class ParameterGExperiment:
                 aggregated[k] = np.array(aggregated[k], dtype=object)
             except Exception:
                 pass
+        print(len(aggregated['seed_explanation']))
 
         dir = f"metadata/{self.dataset_name}/{self.experiment_name}/changing_g.npz"
         os.makedirs(os.path.dirname(dir), exist_ok=True)

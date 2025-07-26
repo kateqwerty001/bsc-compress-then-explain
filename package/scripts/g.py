@@ -23,12 +23,12 @@ for d_name in dataset_names:
         X_test=X_test,
         y_test=y_test,
         model=model,
-        n_repeats=10,
+        n_repeats=5,
         g_values = None,
         kernel = b"gaussian",
         num_bins = 4, 
-        experiment_name="changing_g_num_bins_4_n_repeats_10",
-        description=f"Testing different g values for {d_name} dataset, using num_bins=4 and n_repeats=10",
+        experiment_name="changing_g_num_bins_4_n_repeats_5",
+        description=f"Testing different g values for {d_name} dataset, using num_bins=4 and n_repeats=5",
     )
 
     changing_g.perform()

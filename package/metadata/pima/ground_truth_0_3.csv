@@ -1,0 +1,7 @@
+dataset_name,method,estimator,explanation,kernel,g,num_bins,seed_compression,seed_explanation,compressed_size,original_size,compression_time,explanation_time
+pima,ground_truth,kernel,shap,,,,,1,154,154,0,2.579069137573242
+pima,ground_truth,permutation,sage,,,,,1,154,154,0,22.657943725585938
+pima,ground_truth,kernel,shap,,,,,2,154,154,0,2.4250917434692383
+pima,ground_truth,permutation,sage,,,,,2,154,154,0,25.147614002227783
+pima,ground_truth,kernel,shap,,,,,3,154,154,0,2.6358211040496826
+pima,ground_truth,permutation,sage,,,,,3,154,154,0,24.644651412963867

@@ -1,0 +1,7 @@
+dataset_name,method,estimator,explanation,kernel,g,num_bins,seed_compression,seed_explanation,compressed_size,original_size,compression_time,explanation_time
+compas,ground_truth,kernel,shap,,,,,1,1235,1235,0,225.2704050540924
+compas,ground_truth,permutation,sage,,,,,1,1235,1235,0,678.0219542980194
+compas,ground_truth,kernel,shap,,,,,2,1235,1235,0,90.78786730766296
+compas,ground_truth,permutation,sage,,,,,2,1235,1235,0,526.1413753032684
+compas,ground_truth,kernel,shap,,,,,3,1235,1235,0,88.62193202972412
+compas,ground_truth,permutation,sage,,,,,3,1235,1235,0,660.4037373065948

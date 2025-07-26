@@ -1,0 +1,7 @@
+dataset_name,method,estimator,explanation,kernel,g,num_bins,seed_compression,seed_explanation,compressed_size,original_size,compression_time,explanation_time
+heloc,ground_truth,kernel,shap,,,,,1,1975,1975,0,4142.608404636383
+heloc,ground_truth,permutation,sage,,,,,1,1975,1975,0,1763.8936154842377
+heloc,ground_truth,kernel,shap,,,,,2,1975,1975,0,4018.216519355774
+heloc,ground_truth,permutation,sage,,,,,2,1975,1975,0,1577.1757655143738
+heloc,ground_truth,kernel,shap,,,,,3,1975,1975,0,3985.633492708206
+heloc,ground_truth,permutation,sage,,,,,3,1975,1975,0,1672.9835393428802
