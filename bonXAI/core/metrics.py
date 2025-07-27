@@ -1,25 +1,30 @@
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics.pairwise import rbf_kernel
 import numpy as np
-from sklearn.metrics import mean_absolute_error, accuracy_score
 
+def compute_mae(reference: np.ndarray, estimate: np.ndarray) -> float:
+    return mean_absolute_error(reference, estimate)
 
-def compute_mae(reference: np.ndarray, estimated: np.ndarray) -> float:
-    """
-    Computes Mean Absolute Error between two attribution arrays.
-    """
-    return mean_absolute_error(reference, estimated)
+def compute_mmd(X: np.ndarray, Y: np.ndarray, kernel="rbf", gamma=None) -> float:
+    """Simplified unbiased MMD^2 with RBF kernel"""
 
+    if gamma is None:
+        gamma = 1.0 / X.shape[1]
 
-def compute_fidelity(original_preds: np.ndarray, explained_preds: np.ndarray) -> float:
-    """
-    Measures prediction agreement between original and explained outputs.
-    """
-    return accuracy_score(original_preds, explained_preds)
+    XX = rbf_kernel(X, X, gamma)
+    YY = rbf_kernel(Y, Y, gamma)
+    XY = rbf_kernel(X, Y, gamma)
 
+    m = X.shape[0]
+    n = Y.shape[0]
+    return np.mean(XX) + np.mean(YY) - 2 * np.mean(XY)
 
-def compute_relative_error(reference: np.ndarray, estimated: np.ndarray) -> float:
+def top_k_score(exp, gt, k=5):
     """
-    Relative L1 error: ||ref - est||₁ / ||ref||₁
+    Top-k agreement score between explanation and ground truth.
+    Returns the proportion of overlapping features in the top-k.
     """
-    numerator = np.sum(np.abs(reference - estimated))
-    denominator = np.sum(np.abs(reference)) + 1e-12  # avoid divide by zero
-    return numerator / denominator
+    top_exp = np.argsort(np.abs(exp))[-k:]
+    top_gt = np.argsort(np.abs(gt))[-k:]
+    overlap = len(set(top_exp).intersection(set(top_gt)))
+    return overlap / k
