@@ -49,7 +49,7 @@ class Preprocessor:
 
         elif self.method == "iid":
             n = self.target_size
-            if n is None:
+            if n is None: # in case of compresspp_kt() comparison
                 x = int(np.floor(np.log2(np.sqrt(X.shape[0]))))
                 n = 2 ** x
             start = time.time()
@@ -97,7 +97,6 @@ class Preprocessor:
         for cls in np.unique(pred):
             mask = pred == cls
             X_cls = X[mask]
-            y_cls = y[mask]
 
             if self.g is not None or self.num_bins is not None:
                 idx = compress_kt(X_cls, kernel_type, k_params, g=self.g or 4, num_bins=self.num_bins or 4, seed=self.seed)

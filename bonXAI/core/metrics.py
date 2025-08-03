@@ -15,8 +15,6 @@ def compute_mmd(X: np.ndarray, Y: np.ndarray, kernel="rbf", gamma=None) -> float
     YY = rbf_kernel(Y, Y, gamma)
     XY = rbf_kernel(X, Y, gamma)
 
-    m = X.shape[0]
-    n = Y.shape[0]
     return np.mean(XX) + np.mean(YY) - 2 * np.mean(XY)
 
 def top_k_score(exp, gt, k=5):
