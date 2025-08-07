@@ -4,6 +4,8 @@ from typing import Optional, Tuple
 import shap
 import warnings
 import sage
+import torch
+import torch.nn.functional as F
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -31,6 +33,19 @@ class Explainer:
             raise ValueError(f"Unsupported explainer: {self.name}")
         if self.variant not in {"kernel", "permutation"}:
             raise ValueError(f"Unsupported variant: {self.variant}")
+        
+        if hasattr(model, "predict_proba"):
+            self.predict_proba_fn = model.predict_proba
+        else:
+            self.predict_proba_fn = self._torch_predict_proba
+
+    def _torch_predict_proba(self, X_numpy):
+        X_tensor = torch.tensor(X_numpy).float()
+        self.model.eval()
+        with torch.no_grad():
+            logits = self.model(X_tensor)
+            probs = F.softmax(logits, dim=1).cpu().numpy()
+        return probs
 
     def explain(
         self,
@@ -58,17 +73,17 @@ class Explainer:
     def _explain_shap(self, X: np.ndarray) -> Tuple[np.ndarray, float]:
         start = time.time()
         if self.variant == "kernel":
-            explainer = shap.KernelExplainer(lambda x: self.model.predict_proba(x)[:, 1], X, seed=self.seed)
+            explainer = shap.KernelExplainer(lambda x: self.predict_proba_fn(x)[:, 1], X, seed=self.seed)
             shap_values = explainer(X, silent=True).values
         else:
-            explainer = shap.Explainer(self.model.predict_proba, X, algorithm="permutation")
+            explainer = shap.Explainer(lambda x: self.predict_proba_fn(x), X, algorithm="permutation")
             shap_values = explainer(X, silent=True).values
         end = time.time()
         return shap_values, end - start
 
     def _explain_sage(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
         start = time.time()
-        imputer = sage.MarginalImputer(self.model.predict_proba, X)
+        imputer = sage.MarginalImputer(lambda x: self.predict_proba_fn(x), X)
 
         if self.variant == "permutation":
             estimator = sage.PermutationEstimator(
