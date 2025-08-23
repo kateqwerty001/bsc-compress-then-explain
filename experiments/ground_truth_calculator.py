@@ -29,12 +29,11 @@ def run_explanation(
     model = LoadModel(data_name=data_name, ml_model='ann', pretrained=True)
     model.eval()
 
-    explainer = Explainer(model=model, name=explainer_name, variant=variant, seed=seed)
-
     explanations = []
     times = []
 
     for i in range(num_repeats):
+        explainer = Explainer(model=model, name=explainer_name, variant=variant, seed=seed+i)
         print(f"Repeat {i+1}/{num_repeats}...")
         exp, t = explainer.explain(X_test, y_test)
         explanations.append(exp)

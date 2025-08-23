@@ -20,7 +20,7 @@ class Evaluator:
         return {
             "mae": float(mae),
             "top_k": float(top_k),
-            "time": float(time_elapsed),
+            "explanation_time": float(time_elapsed),
             "size": int(num_samples)
         }
 
