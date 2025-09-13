@@ -29,11 +29,12 @@ def bonxai_compress(X, kernel_type, k_params=np.ones(1), g=0, num_bins=4,
     """
     n = X.shape[0]
     nearest_pow_four = compress.largest_power_of_four(n)
-    if nearest_pow_four != n:
+
+    if nearest_pow_four != n and m is not None:
         input_indices = np.linspace(n-1, 0, nearest_pow_four, dtype=int)[::-1]
-        return input_indices[ compress.compresspp_kt(
+        return input_indices[ bonxai_compress(
             X[input_indices], kernel_type, k_params=k_params, g=g, 
-            num_bins=num_bins, delta=delta, seed=seed, mean0=mean0) ]
+            num_bins=num_bins, m=m, delta=delta, seed=seed, mean0=mean0) ]
     
     if m is None: 
         # no Thin step needed, return the compress_kt coreset of size 2^g * sqrt(n * num_bins)
@@ -84,5 +85,6 @@ def bonxai_compress(X, kernel_type, k_params=np.ones(1), g=0, num_bins=4,
     compressc.compute_K(X, compress_coreset, kernel_type, k_params, K)
     # Use target kt.thin to reduce coreset size from 2^g * sqrt(n * num_bins)
     # to sqrt(n)
+    print("here")
     return compress_coreset[ 
         kt.thin_K(K, K, m, delta=thin_delta, seed=thin_seed, mean0=mean0)]
