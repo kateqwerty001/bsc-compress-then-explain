@@ -85,6 +85,5 @@ def bonxai_compress(X, kernel_type, k_params=np.ones(1), g=0, num_bins=4,
     compressc.compute_K(X, compress_coreset, kernel_type, k_params, K)
     # Use target kt.thin to reduce coreset size from 2^g * sqrt(n * num_bins)
     # to sqrt(n)
-    print("here")
     return compress_coreset[ 
         kt.thin_K(K, K, m, delta=thin_delta, seed=thin_seed, mean0=mean0)]
