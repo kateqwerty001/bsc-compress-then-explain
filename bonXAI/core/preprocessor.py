@@ -103,9 +103,9 @@ class Compressor:
 
         n = target_size
         if n is None:
-            x = int(np.floor(np.log2(np.sqrt(X.shape[0]))))
+            x = int(np.floor(np.log2(np.sqrt(self.X.shape[0]))))
             n = 2 ** x
-        df = pd.DataFrame(self.X, columns=[f"feat_{i}" for i in range(X.shape[1])])
+        df = pd.DataFrame(self.X, columns=[f"feat_{i}" for i in range(self.X.shape[1])])
         df["label"] = pd.Categorical(self.y)
 
         model = arf_mod.arf(x=df)
