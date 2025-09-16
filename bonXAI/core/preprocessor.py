@@ -11,6 +11,7 @@ from pydvl.influence.torch import CgInfluence
 from arfpy import arf as arf_mod
 import pandas as pd
 from stein_thinning.thinning import thin
+from sklearn.mixture import GaussianMixture
 
 class Compressor:
     """
@@ -38,17 +39,45 @@ class Compressor:
         return self.X[indices], self.y[indices], indices, end - start
     
     def _stein_thinning(
-        self, m: int, kernel_type: bytes, grad: Optional[np.ndarray]
+        self, m: int, grad_type: bytes, n_components: int = 2 # good to use 2 for binary classification
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
-        if (grad is None) and (kernel_type == b'gaussian'):
+        grad = None    
+        start = time.time()
+
+        if grad_type == b'gaussian':
             mu = self.X.mean(axis=0)
             Sigma = np.cov(self.X, rowvar=False) + 1e-6*np.eye(self.X.shape[1])  
             prec = np.linalg.inv(Sigma)
             grad = -(self.X - mu) @ prec 
+        
+        elif grad_type == b'kde':
+            n, d = self.X.shape
+            std_dev = self.X.std(axis=0, ddof=1)
+            bandwidth = np.mean(std_dev) * (4 / (d + 2) / n) ** (1 / (d + 4)) # a rule-of-thumb (Silverman-like)
+            diffs = self.X[:, None, :] - self.X[None, :, :]  
+            sq_dist = np.sum(diffs**2, axis=2)     
+            weights = np.exp(-0.5 * sq_dist / bandwidth**2)  
+            grad = -np.einsum('ijk,ij->ik', diffs, weights) / (bandwidth**2 * n)
+
+        elif grad_type == b'gmm':
+            n, d = self.X.shape
+            gmm = GaussianMixture(n_components=n_components, covariance_type='full')
+            gmm.fit(self.X)
+
+            mu = gmm.means_           
+            cov = gmm.covariances_   
+            prec = np.linalg.inv(cov) 
+            resp = gmm.predict_proba(self.X)  
+
+            grad = np.zeros((n, d))
+            for k in range(n_components):
+                diff = mu[k] - self.X           
+                grad += resp[:, [k]] * (diff @ prec[k]) 
+
         if grad is None:
             raise ValueError("Gradient must be provided for non-Gaussian Stein thinning.")
-        start = time.time()
-        indices = thin(self.X, grad, m)  
+        
+        indices = thin(self.X, grad, m)  # Stein thinning
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
 
