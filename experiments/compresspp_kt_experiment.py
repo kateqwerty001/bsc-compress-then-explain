@@ -2,7 +2,7 @@ import numpy as np
 import sys
 import os
 import pandas as pd
-from bonXAI.core.preprocessing import Preprocessor
+from bonXAI.core.preprocessor import Preprocessor
 from bonXAI.core.explainer import Explainer
 from bonXAI.core.evaluation import Evaluator
 from bonXAI.core.utils import set_global_seed

@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional, Tuple, Union, List
 import time
-from bonXAI.core.goodpoints_ext.bonxai_compress import bonxai_compress
+from bonXAI.core.bonxai_compress import bonxai_compress
 from bonXAI.core.kernel import resolve_kernel_params
 import torch
 import torch.nn as nn
