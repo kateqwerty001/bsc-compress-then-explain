@@ -33,6 +33,7 @@ def compresspp_kt(X, kernel_type, k_params=np.ones(1), g=0, num_bins=4,
         b"sobolev" for sum-of-Sobolevs kernel
           sum_j Sobolev(x, y, smoothness = k_params[j])
         b"inverse_multiquadric" for inverse multiquadric kernel
+        b"matern" for Matérn kernel
           
       k_params: Double array of kernel parameters
       g: Oversampling parameter, a nonnegative integer
@@ -119,11 +120,20 @@ def compress_kt(X, kernel_type, k_params=np.ones(1), g=0, num_bins=1,
     Args:
       X: Input sequence of sample points with shape (n, d)
       kernel_type: Byte string name of kernel to use:
-        b"gaussian" for sum-of-Gaussians kernel 
+        b"gaussian" for sum-of-Gaussians kernel
           sum_j exp(-||x-y||_2^2/k_params[j]);
         b"sobolev" for sum-of-Sobolevs kernel
-          sum_j Sobolev(x, y, smoothness = k_params[j])
+          sum_j Sobolev(x, y, smoothness = k_params[j]);
+        b"inverse_multiquadric" for sum-of-Inverse-Multiquadric kernels
+          sum_j 1 / sqrt(c_params[j] + ||x-y||_2^2);
+        b"matern" for sum-of-Matérn kernels
+          sum_j k_nu(x, y) with parameters [sigma, ell, nu]_j, where
+          nu = smoothness parameter and k_nu is the Matérn kernel
       k_params: Double array of kernel parameters
+        - For Gaussian: lam_sqd (squared bandwidths)
+        - For Sobolev: smoothness parameters
+        - For Inverse Multiquadric: c_params > 0
+        - For Matérn: array of shape (num_kernels, 3) with [sigma, ell, nu] per kernel
       g: Oversampling parameter, a nonnegative integer
       num_bins: Number of bins, a positive integer <= n
       lam_sqd: Double array of squared Gaussian kernel bandwidths to compute

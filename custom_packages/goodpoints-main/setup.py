@@ -52,6 +52,13 @@ extensions = [
         library_dirs=[lib_path_npyrandom,lib_path_npymath],
         libraries=['npyrandom','npymath','m'],
     ),
+    Extension(
+        "goodpoints.maternc", [join("goodpoints","maternc.pyx")],
+        extra_compile_args=['-O3'],
+        language="c", include_dirs=[numpy.get_include()],
+        library_dirs=[lib_path_npyrandom,lib_path_npymath],
+        libraries=['npyrandom','npymath','m'],
+    ),
 ]
 
 # Path to Cython declaration (PXD) files

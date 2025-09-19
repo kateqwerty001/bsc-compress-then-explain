@@ -32,6 +32,8 @@ from goodpoints.gaussianc cimport (gaussian_kernel_two_points,
                                   gaussian_kernel_one_point)
 from goodpoints.inverse_multiquadricc cimport (inverse_multiquadric_kernel_two_points,
                                               inverse_multiquadric_kernel_one_point)
+from goodpoints.maternc cimport (matern_kernel_two_points,
+                                matern_kernel_one_point)
 '''
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Compress Functionality %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '''
@@ -64,6 +66,8 @@ cpdef void compute_K(const double[:, :] X,
         b"gaussian" for (sum of) Gaussian kernels with squared bandwidth params,
         b"sobolev" for (sum of) Sobolev kernels with smoothness params
         b"inverse_multiquadric" for Inverse Multiquadric kernel
+        b"matern" for Matérn kernel
+
       k_params: array of kernel parameters (e.g., squared bandwidths for sum of
         Gaussian kernels or smoothness parameters for sum of Sobolev)
       K: array of size (n, n) for storing the kernel matrix
@@ -82,6 +86,10 @@ cpdef void compute_K(const double[:, :] X,
     elif strcmp(kernel_type, b"inverse_multiquadric") == 0:
         k = inverse_multiquadric_kernel_two_points
         kdiag = inverse_multiquadric_kernel_one_point
+    elif strcmp(kernel_type, b"matern") == 0:
+        k = matern_kernel_two_points
+        kdiag = matern_kernel_one_point
+
     # Populate kernel matrix using these kernel functions
     _compute_K(X, input_indices, k, kdiag, k_params, K)
 
@@ -311,6 +319,8 @@ cpdef void compress(const double[:, :] X,
         b"gaussian" for (sum of) Gaussian kernels with squared bandwidth params,
         b"sobolev" for (sum of) Sobolev kernels with smoothness params
         b"inverse_multiquadric" for Inverse Multiquadric kernel
+        b"matern" for Matérn kernel
+
       k_params: Array of kernel parameters
       delta: Run KT-SPLIT with constant failure probabilities delta_i = delta/n
       halve_seed: Nonnegative integer seed to initialize a random number 
@@ -391,6 +401,9 @@ cpdef void compress(const double[:, :] X,
     elif strcmp(kernel_type, b"inverse_multiquadric") == 0:
         k = inverse_multiquadric_kernel_two_points
         kdiag = inverse_multiquadric_kernel_one_point
+    elif strcmp(kernel_type, b"matern") == 0:
+        k = matern_kernel_two_points
+        kdiag = matern_kernel_one_point
     
     # Compress each bin
     # Keep track of current bin's starting index into output indices

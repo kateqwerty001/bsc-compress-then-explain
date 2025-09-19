@@ -13,7 +13,7 @@ cdef double inverse_multiquadric_kernel_two_points(const double[:] X1,
                                                     const double[:] X2,
                                                     const double[:] c_params) noexcept nogil:
     """
-    Computes a sum of inverse multiquadratic kernels:
+    Computes a sum of inverse multiquadric kernels:
     k(X1, X2) = sum_j 1 / sqrt(c_j + ||X1 - X2||^2)
 
     Args:
@@ -45,7 +45,7 @@ cdef double inverse_multiquadric_kernel_two_points(const double[:] X1,
 cdef double inverse_multiquadric_kernel_one_point(const double[:] X1,
                                                   const double[:] c_params) noexcept nogil:
     """
-    Computes the sum of inverse multiquadratic kernels between X1 and itself:
+    Computes the sum of inverse multiquadric kernels between X1 and itself:
     k(X1, X1) = sum_j 1 / sqrt(c_j)
 
     Args:
