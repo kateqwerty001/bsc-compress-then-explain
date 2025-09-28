@@ -1,12 +1,10 @@
-
-import sys
-import os
-sys.path.append("..")
 import time
 import numpy as np
+import os
+import sys
 import pandas as pd
 from sklearn.datasets import make_blobs
-from bonXAI.core.goodpoints_ext.bonxai_compress import bonxai_compress
+from bonXAI.core.bonxai_compress import bonxai_compress
 from bonXAI.core.preprocessor import Preprocessor, Compressor
 from bonXAI.core.metrics import compute_mmd 
 from openxai.dataloader import ReturnLoaders
