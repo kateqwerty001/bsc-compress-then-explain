@@ -40,4 +40,12 @@ def possible_num_bins_values(n_samples: int) -> list[int]:
         power += 1
     return possible_num_bins
 
+def compresspp_kt_output_size(X):
+    """
+    Returns the size of the compressed explanation for compresspp_kt() function based on the input data X.
+    """
+    n = len(X)
+    n_prime = 4 ** int(np.floor(np.log(n) / np.log(4)))
+    return int(np.sqrt(n_prime))
+
 
