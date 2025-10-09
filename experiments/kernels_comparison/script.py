@@ -1,34 +1,30 @@
 import numpy as np
 import pandas as pd
 import os
-import argparse
+import sys
 from bonXAI.core.preprocessor import Preprocessor
 from bonXAI.core.explainer import Explainer
 from bonXAI.core.evaluation import Evaluator
 from bonXAI.core.utils import set_global_seed
-from openxai.dataloader import ReturnLoaders
-from openxai import LoadModel
+from openxai.model import LoadModel, ReturnLoaders
+
+sys.stdout.reconfigure(line_buffering=True)
+
+kernels = ["gaussian", "sobolev", "inverse_multiquadric",
+            "matern_0.5", "matern_1.5", "matern_2.5"]
 
 
-def run_pipeline(dataset_name, explainer_name, variant):
+def run_pipeline(dataset_name, X, y, model, explainer_name, strategy, n_jobs):
     SEED = 0
     N_REPEATS = 33
     set_global_seed(SEED)
 
-    kernels = ["gaussian", "sobolev", "inverse_multiquadric",
-               "matern_0.5", "matern_1.5", "matern_2.5"]
-
-    _, loader_test = ReturnLoaders(data_name=dataset_name, download=False, batch_size=128)
-    X = loader_test.dataset.data
-    y = loader_test.dataset.targets.to_numpy()
-
-    model = LoadModel(data_name=dataset_name, ml_model="ann", pretrained=True)
-
-    gt = np.load(f"package_metadata/{dataset_name}/ground_truth/explanations_{explainer_name}_{variant}_3_repeats.npz")
+    gt = np.load(f"package_metadata/{dataset_name}/ground_truth/explanations_{explainer_name}_{strategy}_3_repeats.npz")
     gt_exp_values, gt_times = gt["exp_values"], gt["times"]
-    gt_exp_mean = np.mean(gt_exp_values, axis=0)
 
-    evaluator = Evaluator(ground_truth_explanation=gt_exp_mean, reference_points=X)
+    mean_gt_exp_values = np.mean(gt_exp_values, axis=0)
+
+    evaluator = Evaluator(ground_truth_explanation=mean_gt_exp_values, ground_truth_points=X)
 
     results = []
 
@@ -60,52 +56,65 @@ def run_pipeline(dataset_name, explainer_name, variant):
 
                 explainer = Explainer(
                     model=model,
-                    name=explainer_name,
-                    variant=variant,
+                    explainer_name=explainer_name,
+                    strategy=strategy,
                     seed=SEED + i
                 )
-                exp_values, time = explainer.explain(X=X_kt, y=y_kt)
 
-                if explainer_name == "shap":
-                    exp_values = np.mean(exp_values, axis=0)
+                exp_values, time = explainer.explain(x_foreground=X, x_background=X_kt, y_foreground=y, n_jobs=n_jobs)
 
                 row = evaluator.evaluate_explanation(exp_values, time, len(X_kt))
                 row.update(evaluator.evaluate_compression(X_kt))
                 row.update({
+                    "explainer": explainer_name,
+                    "strategy": strategy,
                     "method": "kernel_thinning",
+                    "kernel": kernel,
                     "g": 4,
                     "num_bins": 32,
                     "m": m,
                     "compression_time": t_kt,
-                    "kernel": kernel,
-                    "explainer": explainer_name,
-                    "variant": variant,
                 })
                 results.append(row)
                 prev_size = len(X_kt)
 
     df = pd.DataFrame(results)
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    out_dir = os.path.join(base_dir, "results", dataset_name)
-    os.makedirs(out_dir, exist_ok=True)
+    save_dir = f"results/{dataset_name}"
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f"results_{explainer_name}_{strategy}_kernels_comparison.csv")
 
-    df.to_csv(
-        os.path.join(out_dir, f"results_{explainer_name}_{variant}_kernels_comparison.csv"),
-        index=False
-    )
-    print(f"Saved results to {out_dir}")
+    df.to_csv(save_path, index=False)
+    print(f"Saved results to {save_path}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data", type=str, required=True, help="Dataset name")
-    parser.add_argument("--explainer-name", type=str, required=True, help="Explainer name")
-    parser.add_argument("--variant", type=str, required=True, help="Explainer variant")
+    datasets = ["german", "heart", "gaussian", "heloc", "adult", "compas", "gmsc"]
 
-    args = parser.parse_args()
+    for name in datasets:
+        print(f"\n[START] Preparing dataset: {name}")
 
-    run_pipeline(
-        dataset_name=args.data,
-        explainer_name=args.explainer_name,
-        variant=args.variant
-    )
+        _, loader_test = ReturnLoaders(data_name=name, download=True, batch_size=128)
+        X_test = loader_test.dataset.data
+        y_test = loader_test.dataset.targets.to_numpy()
+        model = LoadModel(data_name=name, ml_model="ann", pretrained=True)
+        model.eval()
+
+        run_pipeline(
+            dataset_name=name,
+            X=X_test, 
+            y=y_test,
+            model=model,
+            explainer_name="shap",
+            strategy="kernel", 
+            n_jobs=50,
+        )
+
+        run_pipeline(
+            dataset_name=name,
+            X=X_test, 
+            y=y_test,
+            model=model,
+            explainer_name="sage",
+            strategy="permutation", 
+            n_jobs=16,
+        )

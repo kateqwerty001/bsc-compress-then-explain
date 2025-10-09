@@ -4,9 +4,9 @@ from typing import Dict
 from bonXAI.core.metrics import compute_mae, compute_mmd, top_k_score
 
 class Evaluator:
-    def __init__(self, ground_truth_explanation: np.ndarray, reference_points: np.ndarray):
+    def __init__(self, ground_truth_explanation: np.ndarray, ground_truth_points: np.ndarray):
         self.ground_truth_explanation = ground_truth_explanation
-        self.reference_points = reference_points
+        self.ground_truth_points = ground_truth_points
 
     def evaluate_explanation(
         self,
@@ -14,7 +14,7 @@ class Evaluator:
         time_elapsed: float,
         num_samples: int
     ) -> Dict[str, float]:
-        mae = compute_mae(self.ground_truth_explanation, explanation)
+        mae = compute_mae(explanation, self.ground_truth_explanation)
         top_k = top_k_score(explanation, self.ground_truth_explanation, k=5)
 
         return {
@@ -25,7 +25,7 @@ class Evaluator:
         }
 
     def evaluate_compression(self, compressed_points: np.ndarray) -> Dict[str, float]:
-        mmd = compute_mmd(self.reference_points, compressed_points)
+        mmd = compute_mmd(self.ground_truth_points, compressed_points)
         return {
             "mmd": float(mmd)
         }

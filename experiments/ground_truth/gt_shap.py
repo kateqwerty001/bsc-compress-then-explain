@@ -13,7 +13,7 @@ def run_single_shap(X, y, model, seed, repeat_idx, n_jobs_inner):
 
     bg_threshold = None
     if len(X) > 2500:
-        bg_threshold = max(compresspp_kt_output_size(X) * 50, 2500)
+        bg_threshold = min(max(compresspp_kt_output_size(X) * 50, 2500), 5_000)
 
     print(f"\n[INFO] Repeat {repeat_idx + 1}")
 
