@@ -1,53 +1,57 @@
-import sys
 import os
+import sys
 import numpy as np
 import joblib
 from bonXAI.core.explainer import Explainer
 from bonXAI.core.utils import compresspp_kt_output_size, set_global_seed
-from openxai.model import LoadModel, ReturnLoaders
 
 sys.stdout.reconfigure(line_buffering=True)
 
 
-def _single_repeat_sage(data_name, strategy, batch_size, seed, repeat_idx, n_jobs_inner):
+def run_single_sage(X, y, model, seed, repeat_idx, n_jobs_inner):
     set_global_seed(seed + repeat_idx)
 
-    _, loader_test = ReturnLoaders(data_name=data_name, download=False, batch_size=batch_size)
-    X_test = loader_test.dataset.data
-    y_test = loader_test.dataset.targets.to_numpy()
-
     bg_threshold = None
-    if len(X_test) > 2500:
-        bg_threshold = max(compresspp_kt_output_size(X_test) * 50, 2500)
+    if len(X) > 2500:
+        bg_threshold = max(compresspp_kt_output_size(X) * 50, 2500)
 
-    model = LoadModel(data_name=data_name, ml_model="ann", pretrained=True)
-    model.eval()
-    print(f"Repeat {repeat_idx + 1} starting...")
-    explainer = Explainer(model=model, explainer_name="sage", strategy="permutation", seed=seed + repeat_idx)
-    
-    exp, t = explainer.explain(
-        x_background=X_test,
-        x_foreground=X_test,
-        y_foreground=y_test,
-        n_jobs=n_jobs_inner,
-	bg_threshold=bg_threshold
+    print(f"\n[INFO] Repeat {repeat_idx + 1}")
+
+    explainer = Explainer(
+        model=model,
+        explainer_name="sage",
+        strategy="permutation",
+        seed=seed + repeat_idx
     )
-    print(f"Repeat {repeat_idx + 1} done in {t:.2f}s")
-    return exp, t
+
+    exp, elapsed_time = explainer.explain(
+        x_background=X,
+        x_foreground=X,
+        y_foreground=y,
+        n_jobs=n_jobs_inner,
+        bg_threshold=bg_threshold
+    )
+
+    print(f"[INFO] Repeat {repeat_idx + 1} finished in {elapsed_time:.2f}s.")
+    return exp, elapsed_time
 
 
-def run_explanation_sage_parallel(
-    data_name: str,
-    strategy: str = "permutation",
+def run_sage_explanations(
+    X,
+    y,
+    model,
+    data_name,
     num_repeats: int = 3,
-    batch_size: int = 128,
     seed: int = 42,
     n_jobs_repeats: int = 3,
-    n_jobs_inner: int = 16
+    n_jobs_inner: int = 16,
 ):
+    print(f"\n=== Running SAGE (permutation) for dataset: {data_name} ===")
+
     results = joblib.Parallel(n_jobs=n_jobs_repeats)(
-        joblib.delayed(_single_repeat_sage)(data_name, strategy, batch_size, seed, i, n_jobs_inner)
-        for i in range(num_repeats)
+        joblib.delayed(run_single_sage)(
+            X, y, model, seed, i, n_jobs_inner
+        ) for i in range(num_repeats)
     )
 
     explanations, times = zip(*results)
@@ -56,26 +60,34 @@ def run_explanation_sage_parallel(
 
     save_dir = f"package_metadata/{data_name}/ground_truth"
     os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f"explanations_sage_permutation_{num_repeats}_repeats.npz")
 
-    npz_path = os.path.join(
-        save_dir,
-        f"explanations_sage_{strategy}_{num_repeats}_repeats.npz"
-    )
-    np.savez_compressed(npz_path, exp_values=explanations, times=times)
-    print(f"All explanations and times saved to {npz_path}. {num_repeats} repeats information saved.")
+    np.savez_compressed(save_path, exp_values=explanations, times=times)
+
+    print(f"[DONE] Saved explanations and timings to: {save_path}")
+    print(f"[DONE] Completed {num_repeats} repeats for {data_name}.\n")
 
 
 if __name__ == "__main__":
-    datasets = ["adult"]
+    # Example: using openxai loaders for now, but can be replaced by OpenML in the future
+    from openxai.model import LoadModel, ReturnLoaders
 
-    for data_name in datasets:
-        print(f"Running SAGE (permutation) explanations for {data_name}...")
-        run_explanation_sage_parallel(
-            data_name=data_name,
-            strategy="permutation",
+    datasets = ["compas", "gaussian", "adult", "heart", "heloc", "german"]
+
+    for name in datasets:
+        _, loader_test = ReturnLoaders(data_name=name, download=True, batch_size=128)
+        X_test = loader_test.dataset.data
+        y_test = loader_test.dataset.targets.to_numpy()
+        model = LoadModel(data_name=name, ml_model="ann", pretrained=True)
+        model.eval()
+
+        run_sage_explanations(
+            X=X_test,
+            y=y_test,
+            model=model,
+            data_name=name,
             num_repeats=3,
-            batch_size=128,
             seed=0,
-            n_jobs_repeats=3,   
-            n_jobs_inner=16     
+            n_jobs_repeats=3,
+            n_jobs_inner=16
         )

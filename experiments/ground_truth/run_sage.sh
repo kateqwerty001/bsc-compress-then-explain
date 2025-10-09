@@ -6,9 +6,9 @@
 #SBATCH --nodes=1
 #SBATCH --mem=500G
 #SBATCH --nodelist=dgx-1,dgx-2,dgx-3,dgx-4
-#SBATCH --job-name=adult
-#SBATCH --output=logs/sage_adult.txt
-#SBATCH --error=logs/sage_adult.txt
+#SBATCH --job-name=sage
+#SBATCH --output=logs/sage_log.txt
+#SBATCH --error=logs/sage_err.txt
 
 mkdir -p logs
 

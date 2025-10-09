@@ -2,8 +2,12 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics.pairwise import rbf_kernel
 import numpy as np
 
-def compute_mae(reference: np.ndarray, estimate: np.ndarray) -> float:
-    return mean_absolute_error(reference, estimate)
+def compute_mae(values1: np.ndarray, values2: np.ndarray) -> float:
+    if values1.shape != values2.shape:
+        raise ValueError(f"Shape mismatch: {values1.shape} vs {values2.shape}")
+    
+    return np.mean(np.abs(values2 - values1))
+
 
 def compute_mmd(X: np.ndarray, Y: np.ndarray, kernel="rbf", gamma=None) -> float:
     """Simplified unbiased MMD^2 with RBF kernel"""
@@ -16,6 +20,7 @@ def compute_mmd(X: np.ndarray, Y: np.ndarray, kernel="rbf", gamma=None) -> float
     XY = rbf_kernel(X, Y, gamma)
 
     return np.mean(XX) + np.mean(YY) - 2 * np.mean(XY)
+
 
 def top_k_score(exp, gt, k=5):
     """

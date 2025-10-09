@@ -37,7 +37,7 @@ class Explainer:
             raise ValueError(f"Unsupported strategy: {self.strategy}")
         
         if hasattr(model, "predict_proba"):
-            self.prediction_function = lambda x: model.predict_proba(x)[:, 1] # binary classification
+            self.prediction_function = model.predict_proba
             self.loss = "cross entropy"
         elif hasattr(model, "predict"):
             self.prediction_function = model.predict 
@@ -75,7 +75,7 @@ class Explainer:
             (explanation_values, time_elapsed)
         """
         if bg_threshold is not None and x_background.shape[0] > bg_threshold:
-            np.random.seed(seed=self.seed)
+            np.random.seed(self.seed)
             id_gt = np.random.choice(x_background.shape[0], size=bg_threshold, replace=False)
             x_background = x_background[id_gt]
 

@@ -1,52 +1,57 @@
-import sys
 import os
+import sys
 import numpy as np
-import pandas as pd
-
 from bonXAI.core.explainer import Explainer
-from bonXAI.core.utils import compresspp_kt_output_size
-from bonXAI.core.utils import set_global_seed
+from bonXAI.core.utils import compresspp_kt_output_size, set_global_seed
 from openxai.model import LoadModel, ReturnLoaders
 
 sys.stdout.reconfigure(line_buffering=True)
 
 
-def _single_repeat(data_name, explainer_name, strategy, batch_size, seed, repeat_idx):
+def run_single_shap(X, y, model, seed, repeat_idx, n_jobs_inner):
     set_global_seed(seed + repeat_idx)
 
-    _, loader_test = ReturnLoaders(data_name=data_name, download=False, batch_size=batch_size)
-    X_test = loader_test.dataset.data
-    y_test = loader_test.dataset.targets.to_numpy()
+    bg_threshold = None
+    if len(X) > 2500:
+        bg_threshold = max(compresspp_kt_output_size(X) * 50, 2500)
 
-    bg_theshold = None
-    if len(X_test) > 2500:
-        bg_theshold = max(compresspp_kt_output_size(X_test)*50, 2500)
+    print(f"\n[INFO] Repeat {repeat_idx + 1}")
 
-    model = LoadModel(data_name=data_name, ml_model="ann", pretrained=True)
-    model.eval()
-    
-    explainer = Explainer(model=model, explainer_name=explainer_name, strategy=strategy, seed=seed + repeat_idx)
-    print(f"Repeat {repeat_idx+1}...")
-    if explainer_name == "shap" and strategy == "kernel":
-        exp, t = explainer.explain(x_background=X_test, x_foreground=X_test, y_foreground=y_test, n_jobs=50, bg_threshold=bg_theshold)
-    elif explainer_name == "sage" and strategy == "permutation":
-        exp, t = explainer.explain(x_background=X_test, x_foreground=X_test, y_foreground=y_test, n_jobs=16, bg_threshold=bg_theshold)
-    return exp, t
+    explainer = Explainer(
+        model=model,
+        explainer_name="shap",
+        strategy="kernel",
+        seed=seed + repeat_idx
+    )
+
+    exp, elapsed_time = explainer.explain(
+        x_background=X,
+        x_foreground=X,
+        y_foreground=y,
+        n_jobs=n_jobs_inner,
+        bg_threshold=bg_threshold
+    )
+
+    print(f"[INFO] Repeat {repeat_idx + 1} finished in {elapsed_time:.2f}s.")
+    return exp, elapsed_time
 
 
-def run_explanation(
-    data_name: str,
-    explainer_name: str,
-    strategy: str,
+def run_shap_explanations(
+    X,
+    y,
+    model,
+    data_name: str = "custom_dataset",
     num_repeats: int = 3,
-    batch_size: int = 128,
-    seed: int = 42
+    seed: int = 42,
+    n_jobs_inner: int = 50,
 ):
+    print(f"\n=== Running SHAP (kernel) for dataset: {data_name} ===")
+
     explanations = []
     times = []
 
     for i in range(num_repeats):
-        exp, t = _single_repeat(data_name, explainer_name, strategy, batch_size, seed, i)
+        exp, t = run_single_shap(X, y, model, seed, i, n_jobs_inner)
         explanations.append(exp)
         times.append(t)
 
@@ -55,26 +60,32 @@ def run_explanation(
 
     save_dir = f"package_metadata/{data_name}/ground_truth"
     os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f"explanations_shap_kernel_{num_repeats}_repeats.npz")
 
-    npz_path = os.path.join(
-        save_dir,
-        f"explanations_{explainer_name}_{strategy}_{num_repeats}_repeats.npz"
-    )
-    np.savez_compressed(npz_path, exp_values=explanations, times=times)
-    print(f"All explanations and times saved to {npz_path}. {num_repeats} repeats information saved.")
+    np.savez_compressed(save_path, exp_values=explanations, times=times)
+
+    print(f"[DONE] Saved explanations and timings to: {save_path}")
+    print(f"[DONE] Completed {num_repeats} repeats for {data_name}.\n")
 
 
 if __name__ == "__main__":
     datasets = ["compas", "german", "heart", "gaussian", "heloc", "adult"]
 
-    for data_name in datasets:
-        for explainer, strategy in [("shap", "kernel")]:
-            print(f"Running explanations for {data_name} using {explainer} ({strategy})...")
-            run_explanation(
-                data_name=data_name,
-                explainer_name=explainer,
-                strategy=strategy,
-                num_repeats=3,
-                batch_size=128,
-                seed=0
-            )
+    for name in datasets:
+        print(f"\n[START] Preparing dataset: {name}")
+
+        _, loader_test = ReturnLoaders(data_name=name, download=True, batch_size=128)
+        X_test = loader_test.dataset.data
+        y_test = loader_test.dataset.targets.to_numpy()
+        model = LoadModel(data_name=name, ml_model="ann", pretrained=True)
+        model.eval()
+
+        run_shap_explanations(
+            X=X_test,
+            y=y_test,
+            model=model,
+            data_name=name,
+            num_repeats=3,
+            seed=0,
+            n_jobs_inner=50
+        )
