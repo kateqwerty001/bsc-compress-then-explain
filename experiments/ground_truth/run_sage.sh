@@ -4,11 +4,11 @@
 #SBATCH --time=120:00:00
 #SBATCH --cpus-per-task=48
 #SBATCH --nodes=1
-#SBATCH --mem=500G
+#SBATCH --mem=1000G
 #SBATCH --nodelist=dgx-1,dgx-2,dgx-3,dgx-4
-#SBATCH --job-name=sage
-#SBATCH --output=logs/sage_log.txt
-#SBATCH --error=logs/sage_err.txt
+#SBATCH --job-name=gmsc
+#SBATCH --output=logs/sage_gmsc.txt
+#SBATCH --error=logs/sage_gmsc.txt
 
 mkdir -p logs
 

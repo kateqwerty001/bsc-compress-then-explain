@@ -69,7 +69,7 @@ def run_shap_explanations(
 
 
 if __name__ == "__main__":
-    datasets = ["compas", "german", "heart", "gaussian", "heloc", "adult"]
+    datasets = ["compas", "german", "heart", "gaussian", "heloc", "adult", "gmsc"]
 
     for name in datasets:
         print(f"\n[START] Preparing dataset: {name}")

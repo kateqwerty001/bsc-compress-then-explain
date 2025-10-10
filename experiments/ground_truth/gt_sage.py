@@ -4,6 +4,7 @@ import numpy as np
 import joblib
 from bonXAI.core.explainer import Explainer
 from bonXAI.core.utils import compresspp_kt_output_size, set_global_seed
+from openxai.model import LoadModel, ReturnLoaders
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -69,10 +70,8 @@ def run_sage_explanations(
 
 
 if __name__ == "__main__":
-    # Example: using openxai loaders for now, but can be replaced by OpenML in the future
-    from openxai.model import LoadModel, ReturnLoaders
 
-    datasets = ["compas", "gaussian", "adult", "heart", "heloc", "german"]
+    datasets = ["compas", "gaussian", "adult", "heart", "heloc", "german", "gmsc"]
 
     for name in datasets:
         _, loader_test = ReturnLoaders(data_name=name, download=True, batch_size=128)

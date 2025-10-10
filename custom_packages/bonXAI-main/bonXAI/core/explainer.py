@@ -119,7 +119,6 @@ class Explainer:
                 start = time.time()
                 shap_values = explainer(batch, silent=True).values
                 batch_time = time.time() - start
-                print("Another batch done...")
                 return shap_values, batch_time
             
             results = joblib.Parallel(n_jobs=n_jobs)(

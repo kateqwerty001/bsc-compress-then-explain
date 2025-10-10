@@ -4,11 +4,11 @@
 #SBATCH --time=120:00:00
 #SBATCH --cpus-per-task=50
 #SBATCH --nodes=1
-#SBATCH --mem=500G
+#SBATCH --mem=1000G
 #SBATCH --nodelist=dgx-1,dgx-2,dgx-3,dgx-4
-#SBATCH --job-name=shap
-#SBATCH --output=logs/shap_log.txt
-#SBATCH --error=logs/shap_err.txt
+#SBATCH --job-name=gmsc-shap
+#SBATCH --output=logs/shap_gmsc.txt
+#SBATCH --error=logs/shap_gmsc.txt
 
 mkdir -p logs
 
