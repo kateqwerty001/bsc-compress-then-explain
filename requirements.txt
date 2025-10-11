@@ -12,5 +12,6 @@ shap==0.46.0
 sage-importance==0.0.7
 rfflearn
 stein-thinning
+shapiq
 # OpenXAI must be installed manually from: https://github.com/AI4LIFE-GROUP/OpenXAI
 # openxai 
