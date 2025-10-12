@@ -33,7 +33,7 @@ def top_k_score(exp, gt, k=5):
     exp = np.asarray(exp)
     gt = np.asarray(gt)
 
-    # --- Case 1: 3D SHAP arrays (n_samples, n_features, n_classes)
+    # --- Case 1: 3D SHAP arrays (n_samples, n_features, n_classes) - for SHAP multiclass
     if exp.ndim == 3:
         scores = []
         for e_sample, g_sample in zip(exp, gt):
@@ -46,10 +46,10 @@ def top_k_score(exp, gt, k=5):
             overlap = len(set(top_exp.tolist()).intersection(set(top_gt.tolist())))
             scores.append(overlap / k)
         return np.mean(scores)
-    # --- Case 2: 2D arrays (n_samples, n_features)
+    # --- Case 2: 2D arrays (n_samples, n_features) - for SHAP single output
     elif exp.ndim == 2:
         raise NotImplementedError("2D arrays  are not supported yet.")
-    # --- Case 3: 1D arrays (n_features)
+    # --- Case 3: 1D arrays (n_features) - for SAGE
     elif exp.ndim == 1:
         e_imp = np.abs(exp)
         g_imp = np.abs(gt)
