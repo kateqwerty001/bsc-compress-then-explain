@@ -8,6 +8,7 @@ from bonXAI.core.explainer import Explainer
 from bonXAI.core.evaluation import Evaluator
 from bonXAI.core.utils import set_global_seed
 from openxai.model import LoadModel, ReturnLoaders
+import argparse
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -20,7 +21,7 @@ def run_pipeline(dataset_name, X, y, model, explainer_name, strategy, n_jobs):
     N_REPEATS = 15
     set_global_seed(SEED)
 
-    gt = np.load(f"package_metadata/{dataset_name}/ground_truth/explanations_{explainer_name}_{strategy}_3_repeats.npz")
+    gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/package_metadata/{dataset_name}/ground_truth/explanations_{explainer_name}_{strategy}_3_repeats.npz")
     gt_exp_values, gt_times = gt["exp_values"], gt["times"]
 
     mean_gt_exp_values = np.mean(gt_exp_values, axis=0) # Average over repeats
@@ -41,8 +42,12 @@ def run_pipeline(dataset_name, X, y, model, explainer_name, strategy, n_jobs):
                 data_modification_method="none",
                 seed=SEED + i
             )
-            for m in range(-6, 20, 1):
+            counter = 3
+            for m in range(15, -10, -1):
                 print(f"Repeat {i+1}/{N_REPEATS}, Kernel: {kernel}, m={m}")
+                if  counter <= 0:
+                    continue
+
                 try:
                     X_kt, y_kt, idx_kt, t_kt = pre._preprocess(
                         g=4,
@@ -50,6 +55,7 @@ def run_pipeline(dataset_name, X, y, model, explainer_name, strategy, n_jobs):
                         m=m,
                         kernel=kernel
                     )
+                    
                 except Exception as e:
                     continue
 
@@ -82,6 +88,7 @@ def run_pipeline(dataset_name, X, y, model, explainer_name, strategy, n_jobs):
                 })
                 results.append(row)
                 prev_size = len(X_kt)
+                counter-=1
 
     print("\n[INFO] Running IID Baseline...")
     sizes = pd.DataFrame(results)["size"].unique()
@@ -130,35 +137,33 @@ def run_pipeline(dataset_name, X, y, model, explainer_name, strategy, n_jobs):
 
 
 if __name__ == "__main__":
-    datasets = ["german", "heloc", "adult", "compas", "gmsc", "gaussian", "heart"]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str, required=True)
+    parser.add_argument("--explainer_name", type=str,required=True)
+    parser.add_argument("--strategy", type=str, required=True)
+    parser.add_argument("--n_jobs", type=int, required=True)
+    args = parser.parse_args()
 
-    for name in datasets:
-        print(f"\n[START] Preparing dataset: {name}")
+    dataset_name = args.dataset
+    explainer_name = args.explainer_name
+    strategy = args.strategy
+    n_jobs = args.n_jobs
 
-        _, loader_test = ReturnLoaders(data_name=name, download=True, batch_size=128)
-        X_test = loader_test.dataset.data
-        y_test = loader_test.dataset.targets.to_numpy()
-        model = LoadModel(data_name=name, ml_model="ann", pretrained=True)
-        model.eval()
+    print(f"\n[START] Preparing dataset: {dataset_name}")
 
-        print(f"[INFO] Starting SHAP-Kernel for dataset: {name}")
-        run_pipeline(
-            dataset_name=name,
-            X=X_test, 
-            y=y_test,
-            model=model,
-            explainer_name="shap",
-            strategy="kernel", 
-            n_jobs=50,
-        )
+    _, loader_test = ReturnLoaders(data_name=dataset_name, download=True, batch_size=128)
+    X_test = loader_test.dataset.data
+    y_test = loader_test.dataset.targets.to_numpy()
+    model = LoadModel(data_name=dataset_name, ml_model="ann", pretrained=True)
+    model.eval()
 
-        print(f"[INFO] Starting SAGE-Permutation for dataset: {name}")
-        run_pipeline(
-            dataset_name=name,
-            X=X_test, 
-            y=y_test,
-            model=model,
-            explainer_name="sage",
-            strategy="permutation", 
-            n_jobs=16,
-        )
+    print(f"[INFO] Starting {explainer_name}-{strategy} for dataset: {dataset_name}")
+    run_pipeline(
+        dataset_name=dataset_name,
+        X=X_test, 
+        y=y_test,
+        model=model,
+        explainer_name=explainer_name,
+        strategy=strategy,
+        n_jobs=n_jobs,
+    )
