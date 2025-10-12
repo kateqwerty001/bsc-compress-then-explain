@@ -48,7 +48,15 @@ def top_k_score(exp, gt, k=5):
         return np.mean(scores)
     # --- Case 2: 2D arrays (n_samples, n_features) - for SHAP single output
     elif exp.ndim == 2:
-        raise NotImplementedError("2D arrays  are not supported yet.")
+        n_samples, n_features = exp.shape
+        overlaps = np.empty(n_samples, dtype=float)
+        for i in range(n_samples):
+            e = exp[i]
+            g = gt[i]
+            idx1 = np.argpartition(np.abs(e), -k)[-k:]
+            idx2 = np.argpartition(np.abs(g), -k)[-k:]
+            overlaps[i] = np.intersect1d(idx1, idx2).size / k
+        return float(overlaps.mean())
     # --- Case 3: 1D arrays (n_features) - for SAGE
     elif exp.ndim == 1:
         e_imp = np.abs(exp)
@@ -57,4 +65,28 @@ def top_k_score(exp, gt, k=5):
         top_gt = np.argsort(g_imp)[-k:]
         overlap = len(set(top_exp.tolist()).intersection(set(top_gt.tolist())))
         return overlap / k
+    
+def topk_pair_overlap(pairs_A, pairs_B, k: int = 5) -> float:
+    A = np.stack(pairs_A) if isinstance(pairs_A, (list, tuple)) else np.asarray(pairs_A)
+    B = np.stack(pairs_B) if isinstance(pairs_B, (list, tuple)) else np.asarray(pairs_B)
+    n, d, _ = A.shape
+    iu = np.triu_indices(d, k=1)
+    m = iu[0].size
+    kk = min(max(1, k), m)
+    overlaps = np.empty(n, dtype=float)
+    for s in range(n):
+        a = np.abs(A[s])[iu]
+        b = np.abs(B[s])[iu]
+        if np.allclose(a, b, atol=1e-12):
+            overlaps[s] = 1.0
+            continue
+        ath = np.partition(a, -kk)[-kk]
+        bth = np.partition(b, -kk)[-kk]
+
+        topA = np.flatnonzero(a >= ath)
+        topB = np.flatnonzero(b >= bth)
+
+        denom = max(1, min(len(topA), len(topB)))
+        overlaps[s] = len(np.intersect1d(topA, topB)) / denom
+    return float(overlaps.mean())
 
