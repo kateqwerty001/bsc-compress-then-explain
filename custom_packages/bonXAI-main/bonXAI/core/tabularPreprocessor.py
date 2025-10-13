@@ -73,7 +73,8 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         # drop ID-like columns (recompute after dedup)
         nunique = X.nunique(dropna=False)
         n_rows = len(X)
-        self.id_like_cols_ = nunique[(nunique > 1) & (nunique >= n_rows * self.id_like_threshold)].index.tolist()
+        candidate_cols = nunique[(nunique > 1) & (nunique >= n_rows * self.id_like_threshold)].index
+        self.id_like_cols_ = [col for col in candidate_cols if not pd.api.types.is_float_dtype(X[col])]
         X = X.drop(columns=self.id_like_cols_, errors="ignore")
 
         # drop duplicates from [X|y]
@@ -92,7 +93,8 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         # drop ID-like columns (almost all unique)
         nunique = X.nunique(dropna=False)
         n_rows = len(X)
-        new_id_like = nunique[(nunique > 1) & (nunique >= n_rows * self.id_like_threshold)].index.tolist()
+        new_candidates_id_like = nunique[(nunique > 1) & (nunique >= n_rows * self.id_like_threshold)].index.tolist()
+        new_id_like = [col for col in new_candidates_id_like if not pd.api.types.is_float_dtype(X[col])]
         self.id_like_cols_ = list(set(self.id_like_cols_ + new_id_like))
         X = X.drop(columns=new_id_like, errors="ignore")
 

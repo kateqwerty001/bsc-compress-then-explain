@@ -8,11 +8,11 @@ import openml
 CTR23 = [44956, 44957, 44958, 44990, 44977, 44994, 44959, 44984, 44978, 44979, 44960, 45012, 
          44962, 44992, 44965, 44973, 44993, 44980, 44989, 44983, 41021, 44969, 44963, 44981, 
          44970, 44972, 44976, 44987, 44966, 45402, 44967, 44964, 44974, 44975, 44971]
+CTR23 = sorted(CTR23)
 
 # CC18 benchmark suite - classification tasks
 CC18 = openml.study.get_suite('OpenML-CC18')
 CC18 = CC18.data
-CTR23 = sorted(CTR23)
 
 def set_global_seed(seed: int) -> None:
     """
