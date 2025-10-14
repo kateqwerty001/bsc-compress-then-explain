@@ -103,6 +103,9 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         self.num_cols_ = X.select_dtypes(include=[np.number]).columns.tolist()
         self.cat_cols_ = [c for c in self.raw_cols_ if c not in self.num_cols_]
 
+        if self.cat_cols_:
+            X[self.cat_cols_] = X[self.cat_cols_].astype(str)
+
         # imputers
         self.num_imputer_ = SimpleImputer(strategy="mean")
         self.cat_imputer_ = SimpleImputer(strategy="most_frequent") if self.cat_cols_ else None
@@ -194,6 +197,9 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         X_num = X[self.num_cols_] if self.num_cols_ else pd.DataFrame(index=X.index)
         X_cat = X[self.cat_cols_] if self.cat_cols_ else pd.DataFrame(index=X.index)
 
+        if self.cat_cols_:
+            X_cat = X_cat.astype(str)
+
         # impute
         if self.num_cols_:
             X_num = pd.DataFrame(self.num_imputer_.transform(X_num), columns=self.num_cols_, index=X.index)
@@ -244,6 +250,24 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
             y = y.iloc[:, 0]
         if y.name is None:
             y.name = "target"
+
+        X = X.copy()
+        y = y.copy()
+
+        # convert object columns to numeric if possible
+        for col in X.columns:
+            if X[col].dtype == 'object':
+                X[col] = pd.to_numeric(X[col], errors='coerce')
+
+        # check target validity for regression
+        if self.task_type == 'regression':
+            y = pd.to_numeric(y, errors='coerce')
+            y = y.astype(np.float64) 
+            valid_indices = y.notna()
+            if not valid_indices.all():
+                X = X.loc[valid_indices].reset_index(drop=True)
+                y = y.loc[valid_indices].reset_index(drop=True)
+
         return X, y
 
     def _check_is_fitted(self):
