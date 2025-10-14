@@ -3,7 +3,7 @@ import pandas as pd
 import openml
 from openxai.model import LoadModel, ReturnLoaders
 from sklearn.model_selection import train_test_split
-from bonXAI.core.tabularPreprocessor import TabularPreprocessor
+from bonXAI.core.tabular_preprocessor import TabularPreprocessor
 from bonXAI.core.utils import CC18, CTR23
 from bonXAI.core.pytorch_ann import PyTorchANN
 
