@@ -116,12 +116,19 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
 
         # target encoder for categoricals
         if len(self.cat_cols_) > 0:
-            tgt_type = "binary" if self.task_type_ == "classification" and y.nunique() <= 2 else \
-                       ("continuous" if self.task_type_ == "regression" else "categorical")
+            if self.task_type_ == "classification":
+                tgt_type = "binary" if y.nunique() <= 2 else "multiclass"
+            else: 
+                tgt_type = "continuous"
+
             self.target_encoder_ = TargetEncoder(target_type=tgt_type, random_state=self.random_state)
-            X_cat_enc = pd.DataFrame(self.target_encoder_.fit_transform(X_cat, y), index=X.index, columns=self.cat_cols_)
+            X_cat_enc_np = self.target_encoder_.fit_transform(X_cat, y)
+            
+            self.encoded_cat_names_ = self.target_encoder_.get_feature_names_out(self.cat_cols_)
+            X_cat_enc = pd.DataFrame(X_cat_enc_np, index=X.index, columns=self.encoded_cat_names_)
         else:
             X_cat_enc = pd.DataFrame(index=X.index)
+            self.encoded_cat_names_=[]
 
         # combine numeric + encoded categoricals
         X_enc = pd.concat([X_num, X_cat_enc], axis=1)
@@ -177,11 +184,11 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
             y = y.copy()
             y_name = y.name if y.name is not None else "target"
             XY = pd.concat([X.reset_index(drop=True), y.reset_index(drop=True)], axis=1)
-            XY = XY.drop_duplicates().reset_index(drop=True)
+            XY = XY.drop_duplicates(keep='first').reset_index(drop=True)
             y = XY[y_name]
             X = XY.drop(columns=[y_name])
         else:
-            X = X.drop_duplicates().reset_index(drop=True)
+            X = X.drop_duplicates(keep='first').reset_index(drop=True)
 
         # split
         X_num = X[self.num_cols_] if self.num_cols_ else pd.DataFrame(index=X.index)
@@ -195,7 +202,7 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
 
         # encode categoricals
         if self.cat_cols_:
-            X_cat_enc = pd.DataFrame(self.target_encoder_.transform(X_cat), index=X.index, columns=self.cat_cols_)
+            X_cat_enc = pd.DataFrame(self.target_encoder_.transform(X_cat), index=X.index, columns=self.encoded_cat_names_)
         else:
             X_cat_enc = pd.DataFrame(index=X.index)
         X_enc = pd.concat([X_num, X_cat_enc], axis=1)

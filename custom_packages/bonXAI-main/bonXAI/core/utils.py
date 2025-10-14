@@ -3,6 +3,8 @@ import random
 import numpy as np
 import math
 import openml
+from openxai.model import LoadModel, ReturnLoaders
+from sklearn.model_selection import train_test_split
 
 # CTR23 benchmark suite - regression tasks
 CTR23 = [44956, 44957, 44958, 44990, 44977, 44994, 44959, 44984, 44978, 44979, 44960, 45012, 
@@ -40,6 +42,7 @@ def possible_g_values(n_samples: int, num_bins: int) -> list[int]:
         g += 1
     return list(reversed(possible_g))
 
+
 def possible_num_bins_values(n_samples: int) -> list[int]:
     """
     Returns a list of possible values of num_bins for compress_kt() function based on the number of samples.
@@ -51,12 +54,11 @@ def possible_num_bins_values(n_samples: int) -> list[int]:
         power += 1
     return possible_num_bins
 
-def compresspp_kt_output_size(X):
+
+def compresspp_kt_output_size(X: np.ndarray) -> int:
     """
-    Returns the size of the compressed explanation for compresspp_kt() function based on the input data X.
+    Returns compressed explanation size for compresspp_kt().
     """
     n = len(X)
     n_prime = 4 ** int(np.floor(np.log(n) / np.log(4)))
     return int(np.sqrt(n_prime))
-
-
