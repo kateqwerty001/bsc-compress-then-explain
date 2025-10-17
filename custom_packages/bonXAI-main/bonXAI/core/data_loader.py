@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 from bonXAI.core.pytorch_ann import PyTorchANN
 from bonXAI.core.tabular_preprocessor import TabularPreprocessor
-from bonXAI.core.utils import CC18, CTR23
+from bonXAI.core.utils import CC18_ALL, CTR23_ALL
 from openxai.model import LoadModel, ReturnLoaders
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, XGBRegressor
@@ -90,9 +90,9 @@ class DataLoader:
             - preprocessor: The fitted TabularPreprocessor instance.
         """
         if task_type is None:
-            if dataset_id in CC18:
+            if dataset_id in CC18_ALL:
                 task_type = "classification"
-            elif dataset_id in CTR23:
+            elif dataset_id in CTR23_ALL:
                 task_type = "regression"
             else:
                 raise ValueError(
