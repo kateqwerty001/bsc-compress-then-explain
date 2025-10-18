@@ -32,10 +32,11 @@ class Explainer:
 
     """
 
-    def __init__(self, model, explainer_name: str, strategy: str , seed: int = 0):
+    def __init__(self, model, explainer_name: str, strategy: str, task_type: str, seed: int = 0):
         self.model = model
         self.explainer_name = explainer_name.lower()
         self.strategy = strategy.lower()
+        self.task_type = task_type.lower()
         self.seed = seed
 
         if self.explainer_name not in {"shap", "sage", "shapiq", "expected_gradients"}:
@@ -45,14 +46,14 @@ class Explainer:
         if self.explainer_name == "expected_gradients" and self.strategy != "expected_gradients":
             raise ValueError("For expected_gradients explainer, strategy must be 'expected_gradients'.")
         
-        if hasattr(model, "predict_proba"):
+        if task_type == "classification" and hasattr(model, "predict_proba"):
             self.prediction_function = model.predict_proba
             self.loss = "cross entropy"
-        elif hasattr(model, "predict"):
+        elif task_type == "regression" and hasattr(model, "predict"):
             self.prediction_function = model.predict 
             self.loss = "mse"  
         else:
-            raise ValueError("Model must have either 'predict_proba' or 'predict' method.")
+            raise ValueError("Model must have 'predict_proba' for classification or 'predict' for regression.")
         
         self._shapiq_explainer = None
         self._shapiq_index = "k-SII"      
@@ -61,15 +62,6 @@ class Explainer:
         self._shapiq_budget = 1024
         self._shapiq_class_index = 1  
         self.shapiq_pairwise_ = None
-
-
-    def _torch_predict_proba(self, X_numpy):
-        X_tensor = torch.tensor(X_numpy).float()
-        self.model.eval()
-        with torch.no_grad():
-            logits = self.model(X_tensor)
-            probs = F.softmax(logits, dim=1).cpu().numpy()
-        return probs
 
     def explain(
         self,
@@ -124,7 +116,6 @@ class Explainer:
             start = time.time()
             shap_values = explainer(X_foreground, silent=True)
             total_explanation_time = time.time() - start + initialization_time
-            return shap_values.values, total_explanation_time
         else:
             BATCH_SIZE = 10
             batches = [X_foreground[(i*BATCH_SIZE):(i+1)*BATCH_SIZE] for i in range(int(1+X_foreground.shape[0]/BATCH_SIZE))]
@@ -142,8 +133,14 @@ class Explainer:
 
             shap_values = np.concatenate([sv for sv, _ in results], axis=0)
             total_explanation_time = sum(batch_time for _, batch_time in results) + initialization_time
-            return shap_values, total_explanation_time
 
+        if self.task_type == "classification":
+            predictions = self.prediction_function(X_foreground)
+            predicted_classes = np.argmax(predictions, axis=1)
+            num_samples = X_foreground.shape[0]
+            shap_values = shap_values[np.arange(num_samples), :, predicted_classes]
+
+        return shap_values.values, total_explanation_time
 
     def _explain_sage(
             self,

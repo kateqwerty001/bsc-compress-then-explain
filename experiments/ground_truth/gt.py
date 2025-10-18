@@ -5,6 +5,7 @@ from bonXAI.core.explainer import Explainer
 import argparse
 from bonXAI.core.utils import compresspp_kt_output_size, set_global_seed
 from bonXAI.core.data_loader import DataLoader
+from bonXAI.core.utils import CC18_ALL, CTR23_ALL
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -17,6 +18,7 @@ def run_explanations(
     model_name, 
     explainer_name, 
     strategy, 
+    task_type,
     num_repeats,
     seed,
     n_jobs,
@@ -34,6 +36,7 @@ def run_explanations(
             model=model,
             explainer_name=explainer_name,
             strategy=strategy,
+            task_type=task_type,
             seed=seed + i
         )
 
@@ -97,6 +100,14 @@ if __name__ == "__main__":
     else:
         X_background = X_test
        
+    if int(args.dataset_id) in CC18_ALL:
+        task_type = "classification"
+    elif int(args.dataset_id) in CTR23_ALL:
+        task_type = "regression"
+    else:
+        raise ValueError(f"Dataset ID {args.dataset_id} not found in CC18 or CTR23 benchmarks.")
+
+
     run_explanations( 
         dataset_name = dataset_name,
         X_background = X_background,
@@ -106,6 +117,7 @@ if __name__ == "__main__":
         model_name = args.model_name, 
         explainer_name = args.explainer_name, 
         strategy = args.strategy, 
+        task_type = task_type,
         num_repeats = 3,
         seed = 42,
         n_jobs = int(args.n_jobs),
