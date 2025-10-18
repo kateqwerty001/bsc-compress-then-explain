@@ -76,7 +76,6 @@ class Explainer:
         X_foreground: np.ndarray,
         X_background: np.ndarray,
         n_jobs: int,
-        bg_threshold: int = None,
         y_foreground: Optional[np.ndarray] = None
     ) -> Tuple[np.ndarray, float]:
         """
@@ -85,21 +84,12 @@ class Explainer:
         Parameters:
             X_foreground: data points to explain
             X_background: background data for reference
-            bg_threshold: if X_background data is larger than this threshold, it will be randomly downsampled to this size
             n_jobs: number of parallel jobs (for SAGE - sage library implementation, for SHAP - custom implementation)
             y: ground truth labels (required for SAGE)
 
         Returns:
             (explanation_values, time_elapsed)
         """
-        if bg_threshold is not None and X_background.shape[0] > bg_threshold:
-            np.random.seed(self.seed) 
-            id_gt = np.random.choice(X_background.shape[0], size=bg_threshold, replace=False)
-            X_background = X_background[id_gt]
-
-        if bg_threshold is None:
-            print(f"Using all {X_background.shape[0]} background samples.")
-
         if self.explainer_name == "shap":
             return self._explain_shap(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
         elif self.explainer_name == "sage":
@@ -256,7 +246,7 @@ class Explainer:
                 joblib.delayed(explainer.attribute)(X_foreground, X_background[[i]], target=class_index) 
                 for i in range(X_background.shape[0])
             ]
-            results = joblib.Parallel(n_jobs=8)(tasks)
+            results = joblib.Parallel(n_jobs=n_jobs)(tasks)
             explanation_for_one_class = torch.mean(torch.stack(results), dim=0)
 
             explanations_per_class.append(explanation_for_one_class)

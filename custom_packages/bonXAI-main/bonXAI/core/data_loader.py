@@ -120,6 +120,7 @@ class DataLoader:
         model.fit(X_train_processed.values, y_train_processed)
 
         return (
+            dataset.name,
             X_train_processed.to_numpy(),
             y_train_processed,
             X_test_processed.to_numpy(),
