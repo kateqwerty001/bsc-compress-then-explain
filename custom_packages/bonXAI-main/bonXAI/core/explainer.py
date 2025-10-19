@@ -140,7 +140,7 @@ class Explainer:
             num_samples = X_foreground.shape[0]
             shap_values = shap_values[np.arange(num_samples), :, predicted_classes]
 
-        return shap_values.values, total_explanation_time
+        return shap_values, total_explanation_time
 
     def _explain_sage(
             self,
@@ -222,34 +222,59 @@ class Explainer:
         main_effects = np.vstack(main_effects)
         self.shapiq_pairwise_ = pairwise_list
         return main_effects, elapsed
-    
+        
     def _explain_expected_gradients(self,
             X_background: np.ndarray,
             X_foreground: np.ndarray,
-            n_jobs: int = 16
+            n_jobs: int = 8
         ):
         print(f"Explaining with Expected Gradients. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
         start = time.time()
 
         if not isinstance(self.model, PyTorchANN):
-            raise TypeError("model must be an instance of PytorchANN")
-        
-        num_classes = self.model.model_.network[-1].out_features
+            raise TypeError("model must be an instance of PyTorchANN")
 
+        inputs = torch.as_tensor(X_foreground, dtype=torch.float32)
+        baselines = torch.as_tensor(X_background, dtype=torch.float32)
         explainer = captum.attr.IntegratedGradients(self.model.model_)
-        explanations_per_class = []
-        for class_index in range(num_classes):
-            tasks = [
-                joblib.delayed(explainer.attribute)(X_foreground, X_background[[i]], target=class_index) 
-                for i in range(X_background.shape[0])
-            ]
-            results = joblib.Parallel(n_jobs=n_jobs)(tasks)
-            explanation_for_one_class = torch.mean(torch.stack(results), dim=0)
 
-            explanations_per_class.append(explanation_for_one_class)
+        explanations = []
 
-        final_explanations = torch.stack(explanations_per_class, dim=2)
+        if self.task_type == "classification":
+            predicted_classes = self.predict(X_foreground)
 
+            for i, target_class in enumerate(predicted_classes):
+                x_sample = inputs[i : i + 1]
+                tasks = [
+                    joblib.delayed(explainer.attribute)(
+                        x_sample,
+                        baselines[[j]],
+                        target=int(target_class)
+                    )
+                    for j in range(baselines.shape[0])
+                ]
+                results = joblib.Parallel(n_jobs=n_jobs)(tasks)
+                explanation = torch.mean(torch.stack(results), dim=0)
+                explanations.append(explanation.detach().cpu().numpy().ravel())
+
+        elif self.task_type == "regression":
+            for i in range(inputs.shape[0]):
+                x_sample = inputs[i : i + 1]
+                tasks = [
+                    joblib.delayed(explainer.attribute)(
+                        x_sample,
+                        baselines[[j]]
+                    )
+                    for j in range(baselines.shape[0])
+                ]
+                results = joblib.Parallel(n_jobs=n_jobs)(tasks)
+                explanation = torch.mean(torch.stack(results), dim=0)
+                explanations.append(explanation.detach().cpu().numpy().ravel())
+        else:
+            raise ValueError("task_type must be 'classification' or 'regression'")
+
+        final_explanations = torch.tensor(explanations, dtype=torch.float32)
         elapsed = time.time() - start
 
         return final_explanations, elapsed
+

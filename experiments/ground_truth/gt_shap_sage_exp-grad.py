@@ -30,7 +30,6 @@ def run_explanations(
 
     for i in range(num_repeats):
         print(f"\n[INFO] Repeat {i + 1}")
-        set_global_seed(i)
 
         explainer = Explainer(
             model=model,
@@ -55,7 +54,7 @@ def run_explanations(
 
     save_dir = f"package_metadata/openml/{dataset_name}/ground_truth"
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"shap_kernel_{num_repeats}_{model_name}.npz")
+    save_path = os.path.join(save_dir, f"{explainer_name}_{strategy}_{num_repeats}_{model_name}.npz")
 
     np.savez_compressed(save_path, exp_values=explanations, times=times)
 
@@ -73,18 +72,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     set_global_seed(0)
+    
     loader = DataLoader()
     dataset_name, X_train, y_train, X_test, y_test, model, _ = loader.load_from_openml(dataset_id=int(args.dataset_id), model_name=args.model_name)
-
-    X_test = X_test[:10]
-    y_test = y_test[:10]
 
     print(f"\n[START] Preparing dataset: {dataset_name}")
 
     model.model_.eval()
 
-    # For SHAP Kernel we use max 4096 samples as foreground points
-    if args.explainer_name == "shap" and args.strategy == "kernel" and len(X_test) > 4096:
+    # For [SHAP Kernel, Expected Gradients] we use max 4096 samples as foreground points
+    if (args.explainer_name == "shap" and args.strategy == "kernel" or args.explainer_name == "expected_gradients" and args.strategy == "expected_gradients") and len(X_test) > 4096:
         rng = np.random.default_rng(int(args.dataset_id)) # seed is set for future comparability with other methods
         ids = rng.choice(len(X_test), size=4096, replace=False)
         X_foreground = X_test[ids]
@@ -93,7 +90,7 @@ if __name__ == "__main__":
         X_foreground = X_test
         y_foreground = y_test
 
-    # For both SHAP Kernel and SAGE Permutation we use max 5000 samples as background points
+    # For [SHAP Kernel, SAGE Permutation, Expected Gradients] we use max 5000 samples as background points
     if len(X_test) > 5000:
         rng = np.random.default_rng(13 + int(args.dataset_id))
         X_background = rng.choice(X_test, size=5000, replace=False)
@@ -106,7 +103,6 @@ if __name__ == "__main__":
         task_type = "regression"
     else:
         raise ValueError(f"Dataset ID {args.dataset_id} not found in CC18 or CTR23 benchmarks.")
-
 
     run_explanations( 
         dataset_name = dataset_name,

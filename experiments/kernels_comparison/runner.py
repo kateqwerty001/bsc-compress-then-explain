@@ -23,10 +23,6 @@ for dataset in datasets:
 #SBATCH --error=logs/{job_name}_err.txt
 #SBATCH --cpus-per-task={n_jobs}
 
-mkdir -p logs
-source ~/anaconda3/etc/profile.d/conda.sh
-conda activate bsc_cte
-
 /mnt/evafs/faculty/home/kbokhan/bsc_cte/bin/python /mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/kernels_comparison/script.py \\
   --dataset {dataset} \\
   --explainer_name {explainer_name} \\

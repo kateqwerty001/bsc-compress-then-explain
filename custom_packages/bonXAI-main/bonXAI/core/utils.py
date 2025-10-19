@@ -5,6 +5,7 @@ import math
 import openml
 from openxai.model import LoadModel, ReturnLoaders
 from sklearn.model_selection import train_test_split
+import torch
 
 # CTR23 benchmark suite - regression tasks
 CTR23_ALL = [44956, 44957, 44958, 44990, 44977, 44994, 44959, 44984, 44978, 44979, 44960, 45012, 
@@ -30,7 +31,19 @@ def set_global_seed(seed: int) -> None:
     """
     random.seed(seed)
     np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
     os.environ["PYTHONHASHSEED"] = str(seed)
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    os.environ["JOBLIB_START_METHOD"] = "spawn"
 
 
 def possible_g_values(n_samples: int, num_bins: int) -> list[int]:
