@@ -241,7 +241,8 @@ class Explainer:
         explanations = []
 
         if self.task_type == "classification":
-            predicted_classes = self.predict(X_foreground)
+            predictions = self.prediction_function(X_foreground)
+            predicted_classes = np.argmax(predictions, axis=1)
 
             for i, target_class in enumerate(predicted_classes):
                 x_sample = inputs[i : i + 1]
