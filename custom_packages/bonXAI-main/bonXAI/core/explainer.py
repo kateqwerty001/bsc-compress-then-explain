@@ -9,8 +9,8 @@ import torch
 import torch.nn.functional as F
 import joblib
 import captum
-from shapiq.explainer.tabular import TabularExplainer as ShapiqTabularExplainer
 from bonXAI.core.pytorch_ann import PyTorchANN
+import shapiq
 
 warnings.filterwarnings("ignore", category=UserWarning)
 try:
@@ -41,7 +41,7 @@ class Explainer:
 
         if self.explainer_name not in {"shap", "sage", "shapiq", "expected_gradients"}:
             raise ValueError(f"Unsupported explainer: {self.explainer_name}")
-        if self.strategy not in {"kernel", "permutation", "expected_gradients"}:
+        if self.strategy not in {"kernel", "permutation", "shapiq", "expected_gradients"}:
             raise ValueError(f"Unsupported strategy: {self.strategy}")
         if self.explainer_name == "expected_gradients" and self.strategy != "expected_gradients":
             raise ValueError("For expected_gradients explainer, strategy must be 'expected_gradients'.")
@@ -54,14 +54,6 @@ class Explainer:
             self.loss = "mse"  
         else:
             raise ValueError("Model must have 'predict_proba' for classification or 'predict' for regression.")
-        
-        self._shapiq_explainer = None
-        self._shapiq_index = "k-SII"      
-        self._shapiq_max_order = 2
-        self._shapiq_imputer = "marginal" 
-        self._shapiq_budget = 1024
-        self._shapiq_class_index = 1  
-        self.shapiq_pairwise_ = None
 
     def explain(
         self,
@@ -88,10 +80,10 @@ class Explainer:
             if y_foreground is None:
                 raise ValueError("SAGE explanation requires labels (y).")
             return self._explain_sage(X_background=X_background, X_foreground=X_foreground, y_foreground=y_foreground, n_jobs=n_jobs)
-        elif self.explainer_name == "shapiq":
-            return self._explain_shapiq(X_background=X_background, X_foreground=X_foreground)
         elif self.explainer_name == "expected_gradients":
             return self._explain_expected_gradients(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
+        elif self.explainer_name == "shapiq":
+            return self._explain_shapiq(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
         raise RuntimeError("Invalid configuration.")
 
     def _explain_shap(
@@ -171,58 +163,56 @@ class Explainer:
         end = time.time()
         elapsed = end - start
         return sage_values, elapsed
+    
+    def _explain_shapiq(
+            self,
+            X_background: np.ndarray,
+            X_foreground: np.ndarray,
+            n_jobs: int = None
+        ) -> Tuple[np.ndarray, float]:
+        print(f"Explaining with ShapIQ. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
+        start = time.time()
+        if self.task_type == "regression":
+            model_func = self.prediction_function
+        elif self.task_type == "classification":
+            def model_func(X):
+                proba = self.prediction_function(X)
+                preds = np.argmax(proba, axis=1)
+                return np.array([proba[i, preds[i]] for i in range(len(preds))])
 
-    def _ensure_shapiq(self, background_X: np.ndarray):
-        if self._shapiq_explainer is not None:
-            return
-        if hasattr(self.model, "predict_proba"):
-            model_fn = lambda x: self.prediction_function(x)[:, self._shapiq_class_index]
-        else:
-            model_fn = lambda x: np.asarray(self.prediction_function(x)).ravel()
-
-        self._shapiq_explainer = ShapiqTabularExplainer(
-            model=model_fn,
-            data=np.asarray(background_X),
-            imputer=self._shapiq_imputer,
-            index=self._shapiq_index,
-            max_order=self._shapiq_max_order,
-            random_state=self.seed,
-            verbose=False,
+        imputer = shapiq.MarginalImputer(
+            model=model_func,
+            data=X_background,
+            sample_size=len(X_background)
         )
 
-    def _explain_shapiq(
-        self,
-        X_background: np.ndarray,
-        X_foreground: np.ndarray,
-    ) -> Tuple[np.ndarray, float]:
-        print(f"Explaining with SHAPIQ (k-SII, max_order=2). "
-              f"{len(X_foreground)} samples to explain using {len(X_background)} background samples.")
-
-        start = time.time()
-        self._ensure_shapiq(X_background)
-
+        explainer = shapiq.TabularExplainer(
+            model=model_func,
+            data=X_background,
+            approximator="regression",
+            index="k-SII",
+            max_order=2,
+            imputer=imputer
+        )
         main_effects = []
         pairwise_list = []
 
         for i in range(X_foreground.shape[0]):
-            iv = self._shapiq_explainer.explain_function(
-                x=X_foreground[i : i + 1],
-                budget=self._shapiq_budget,
-                random_state=self.seed,
-            )
+            iv = explainer.explain(X_foreground[i], budget=1024, random_state=self.seed)
             main = np.asarray(iv.get_n_order_values(1)).ravel()
+            main_effects.append(main)
             try:
                 pair = iv.get_n_order_values(2)
             except Exception:
                 pair = None
-            main_effects.append(main)
+                print("No pairwise interactions found for sample:", i)
             pairwise_list.append(pair)
 
+        self.main_effects = np.vstack(main_effects)
         elapsed = time.time() - start
-        main_effects = np.vstack(main_effects)
-        self.shapiq_pairwise_ = pairwise_list
-        return main_effects, elapsed
-        
+        return pairwise_list, elapsed
+
+
     def _explain_expected_gradients(self,
             X_background: np.ndarray,
             X_foreground: np.ndarray,
