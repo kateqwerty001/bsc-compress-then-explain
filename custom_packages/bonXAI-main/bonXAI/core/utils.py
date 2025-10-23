@@ -18,12 +18,10 @@ CTR23_LARGE = [44964, 44975, 44981, 44992]
 CTR23_SMALL = [44956, 44963, 44969, 44971, 44973, 44974, 44976, 44977, 44978, 44979, 44980, 44983, 44984, 44989, 44990, 44993, 45012]
 
 # CC18 benchmark suite - classification tasks
-CC18_ALL = openml.study.get_suite('OpenML-CC18')
-CC18_ALL = CC18_ALL.data
-
 # used for experiments 
 CC18_LARGE = [28, 44, 182, 300, 554, 1486, 1475, 4538, 1478, 40499, 40668, 40996, 40923, 40927]
 CC18_SMALL = [6, 32, 151, 1053, 1590, 1489, 1497, 4534, 1461, 40983, 41027, 23517, 40701]
+CC18_ALL = CC18_LARGE + CC18_SMALL
 
 def set_global_seed(seed: int) -> None:
     """

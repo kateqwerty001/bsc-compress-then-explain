@@ -111,3 +111,5 @@ for dataset_id in CC18_LARGE + CTR23_LARGE:
         os.system(f"chmod +x {sh_file}")
         os.system(f"sbatch {sh_file}")
         print(f"--> Submitted job: {job_name}")
+
+# PROBLEMS CURRENTLY WITH EXPECTED GRADIENTS ON DATASETS: 40923, 40927, 55, 40996
