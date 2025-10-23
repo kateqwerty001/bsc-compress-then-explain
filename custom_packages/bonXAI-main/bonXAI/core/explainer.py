@@ -11,6 +11,8 @@ import joblib
 import captum
 from bonXAI.core.pytorch_ann import PyTorchANN
 import shapiq
+from torch.utils.data import DataLoader, TensorDataset
+from pydvl.influence.torch import CgInfluence
 
 warnings.filterwarnings("ignore", category=UserWarning)
 try:
@@ -38,10 +40,11 @@ class Explainer:
         self.strategy = strategy.lower()
         self.task_type = task_type.lower()
         self.seed = seed
-
-        if self.explainer_name not in {"shap", "sage", "shapiq", "expected_gradients"}:
+# we need to add "na" option to strategy for shapiq, expected_gradients and influence and rewrite shao explainer to
+# handle not if else but elifs + raise error if strategy not compatible with explainer
+        if self.explainer_name not in {"shap", "sage", "shapiq", "expected_gradients", "influence"}:
             raise ValueError(f"Unsupported explainer: {self.explainer_name}")
-        if self.strategy not in {"kernel", "permutation", "shapiq", "expected_gradients"}:
+        if self.strategy not in {"kernel", "permutation", "shapiq", "expected_gradients", "influence"}:
             raise ValueError(f"Unsupported strategy: {self.strategy}")
         if self.explainer_name == "expected_gradients" and self.strategy != "expected_gradients":
             raise ValueError("For expected_gradients explainer, strategy must be 'expected_gradients'.")
@@ -60,7 +63,8 @@ class Explainer:
         X_foreground: np.ndarray,
         X_background: np.ndarray,
         n_jobs: int,
-        y_foreground: Optional[np.ndarray] = None
+        y_foreground: Optional[np.ndarray] = None,
+        y_background: Optional[np.ndarray] = None
     ) -> Tuple[np.ndarray, float]:
         """
         Generate explanations.
@@ -84,6 +88,10 @@ class Explainer:
             return self._explain_expected_gradients(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
         elif self.explainer_name == "shapiq":
             return self._explain_shapiq(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
+        elif self.explainer_name == "influence":
+            if y_foreground is None or y_background is None:
+                raise ValueError("Influence explanation requires both foreground and background labels (y).")
+            return self._explain_influence(X_background=X_background, y_background=y_background, X_foreground=X_foreground, y_foreground=y_foreground)
         raise RuntimeError("Invalid configuration.")
 
     def _explain_shap(
@@ -268,4 +276,53 @@ class Explainer:
         elapsed = time.time() - start
 
         return final_explanations, elapsed
+
+    def _explain_influence(
+            self,
+            X_background: np.ndarray,
+            y_background: np.ndarray,
+            X_foreground: np.ndarray,
+            y_foreground: np.ndarray
+        ) -> Tuple[np.ndarray, float]:
+        if isinstance(self.model, PyTorchANN):
+            model = self.model.model_  
+        elif isinstance(self.model, torch.nn.Module):
+            model = self.model
+        else:
+            raise TypeError("Influence explainer requires a PyTorch model or PyTorchANN wrapper.")
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device)
+        model.eval()
+
+        start = time.time()
+
+        X_train = torch.tensor(X_background).float().to(device)
+        y_train = torch.tensor(y_background).long().to(device)
+
+        X_test = torch.tensor(X_foreground).float().to(device)
+        y_test = torch.tensor(y_foreground).long().to(device)
+
+        train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=128, shuffle=False)
+
+        if self.task_type == "classification":
+            loss_fn = torch.nn.CrossEntropyLoss()
+        else:
+            loss_fn = torch.nn.MSELoss()
+
+        influence_model = CgInfluence(
+            model,
+            loss_fn,
+            regularization=1e-3,
+            rtol=1e-7,
+            atol=1e-7,
+            solve_simultaneously=True
+        ).fit(train_loader)
+
+        influence_matrix = influence_model.influences(
+            X_test, y_test, X_train, y_train, mode="up"
+        ).cpu().numpy()
+
+        elapsed = time.time() - start
+        return influence_matrix, elapsed
 
