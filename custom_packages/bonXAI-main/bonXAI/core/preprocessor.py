@@ -156,7 +156,8 @@ class Compressor:
         if n is None:
             n = self.X.shape[0]
         start = time.time()
-        indices = np.random.choice(self.X.shape[0], size=n, replace=False)
+        rng = np.random.default_rng(self.seed)
+        indices = rng.choice(self.X.shape[0], size=n, replace=False)
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
 

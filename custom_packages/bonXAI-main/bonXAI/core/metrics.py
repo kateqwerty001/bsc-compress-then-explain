@@ -5,6 +5,8 @@ import numpy as np
 def compute_mae(values1: np.ndarray, values2: np.ndarray) -> float:
     if values1.shape != values2.shape:
         raise ValueError(f"Shape mismatch: {values1.shape} vs {values2.shape}")
+    if not np.isfinite(values1).all() or not np.isfinite(values2).all():
+        raise ValueError("inputs must be finite")
     
     return np.mean(np.abs(values2 - values1))
 
@@ -14,6 +16,11 @@ def compute_mmd(X: np.ndarray, Y: np.ndarray, kernel="rbf", gamma=None) -> float
 
     if gamma is None:
         gamma = 1.0 / X.shape[1]
+    
+    if X.shape[1] != Y.shape[1]:
+        raise ValueError("feature dimensions must match")
+    if not (np.isfinite(X).all() and np.isfinite(Y).all()):
+        raise ValueError("inputs must be finite")
 
     XX = rbf_kernel(X, X, gamma)
     YY = rbf_kernel(Y, Y, gamma)
@@ -32,6 +39,26 @@ def top_k_score(exp, gt, k=5):
     """
     exp = np.asarray(exp)
     gt = np.asarray(gt)
+
+    if exp.shape != gt.shape:
+        raise ValueError(f"Shape mismatch: {exp.shape} vs {gt.shape}")
+    if exp.ndim not in (1, 2, 3):
+        raise ValueError(f"Unsupported ndim={exp.ndim}. Must be 1D, 2D, or 3D.")
+    if not (np.isfinite(exp).all() and np.isfinite(gt).all()):
+        raise ValueError("Inputs must contain only finite values (no NaN/Inf).")
+
+    if exp.ndim == 1:
+        d = exp.shape[0]
+    elif exp.ndim == 2:
+        d = exp.shape[1]
+    else: 
+        d = exp.shape[1]
+    if not isinstance(k, (int, np.integer)):
+        raise TypeError(f"k must be an integer, got {type(k).__name__}")
+    if k <= 0:
+        raise ValueError(f"k must be positive, got {k}")
+    if k > d:
+        k = d
 
     # --- Case 1: 3D SHAP arrays (n_samples, n_features, n_classes) - for SHAP multiclass
     if exp.ndim == 3:
@@ -67,9 +94,16 @@ def top_k_score(exp, gt, k=5):
         return overlap / k
     
 def topk_pair_overlap(pairs_A, pairs_B, k: int = 5) -> float:
+    if pairs_A.shape != pairs_B.shape or pairs_A.ndim != 3 or pairs_A.shape[1] != pairs_A.shape[2]:
+        raise ValueError("A and B must be (n, d, d) with same shape")
+
     A = np.stack(pairs_A) if isinstance(pairs_A, (list, tuple)) else np.asarray(pairs_A)
     B = np.stack(pairs_B) if isinstance(pairs_B, (list, tuple)) else np.asarray(pairs_B)
     n, d, _ = A.shape
+    if d < 2:
+        raise ValueError("d must be >= 2 for pair overlap")
+    if not (np.isfinite(A).all() and np.isfinite(B).all()):
+        raise ValueError("inputs must be finite")
     iu = np.triu_indices(d, k=1)
     m = iu[0].size
     kk = min(max(1, k), m)

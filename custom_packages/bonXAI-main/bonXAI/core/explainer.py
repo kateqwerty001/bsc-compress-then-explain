@@ -34,20 +34,17 @@ class Explainer:
 
     """
 
-    def __init__(self, model, explainer_name: str, strategy: str, task_type: str, seed: int = 0):
+    def __init__(self, model, explainer_name: str, task_type: str, strategy: str = "na", seed: int = 0):
         self.model = model
         self.explainer_name = explainer_name.lower()
         self.strategy = strategy.lower()
         self.task_type = task_type.lower()
         self.seed = seed
-# we need to add "na" option to strategy for shapiq, expected_gradients and influence and rewrite shao explainer to
-# handle not if else but elifs + raise error if strategy not compatible with explainer
+
         if self.explainer_name not in {"shap", "sage", "shapiq", "expected_gradients", "influence"}:
             raise ValueError(f"Unsupported explainer: {self.explainer_name}")
-        if self.strategy not in {"kernel", "permutation", "shapiq", "expected_gradients", "influence"}:
+        if self.strategy not in {"kernel", "permutation", "na"}:
             raise ValueError(f"Unsupported strategy: {self.strategy}")
-        if self.explainer_name == "expected_gradients" and self.strategy != "expected_gradients":
-            raise ValueError("For expected_gradients explainer, strategy must be 'expected_gradients'.")
         
         if task_type == "classification" and hasattr(model, "predict_proba"):
             self.prediction_function = model.predict_proba
@@ -105,9 +102,11 @@ class Explainer:
         start = time.time()
         if self.strategy == "kernel":
             explainer = shap.KernelExplainer(self.prediction_function, X_background, seed=self.seed)
-        else:
+        elif self.strategy == "permutation":
             masker = shap.maskers.Independent(X_background, max_samples=X_background.shape[0])
             explainer = shap.PermutationExplainer(self.prediction_function, masker, seed=self.seed)
+        else:
+            raise ValueError(f"Unknown strategy for SHAP: {self.strategy}")
         initialization_time = time.time() - start
 
         total_explanation_time = 0.0
@@ -161,11 +160,13 @@ class Explainer:
 
         if self.strategy == "kernel":
             explainer = sage.KernelEstimator(imputer, loss=self.loss, random_state=self.seed)
-        else:
+        elif self.strategy == "permutation":
             if n_jobs is None:
                 explainer = sage.PermutationEstimator(imputer, loss=self.loss, random_state=self.seed)
             else:
                 explainer = sage.PermutationEstimator(imputer, loss=self.loss, random_state=self.seed, n_jobs=n_jobs)
+        else:
+            raise ValueError(f"Unknown strategy for SAGE: {self.strategy}")
 
         sage_values = explainer(X_foreground, y_foreground, bar=False, verbose=False).values
         end = time.time()

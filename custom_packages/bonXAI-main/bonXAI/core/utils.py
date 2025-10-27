@@ -79,5 +79,7 @@ def compresspp_kt_output_size(X: np.ndarray) -> int:
     Returns compressed explanation size for compresspp_kt().
     """
     n = len(X)
+    if n <= 0:
+        raise ValueError("X must be non-empty")
     n_prime = 4 ** int(np.floor(np.log(n) / np.log(4)))
     return int(np.sqrt(n_prime))

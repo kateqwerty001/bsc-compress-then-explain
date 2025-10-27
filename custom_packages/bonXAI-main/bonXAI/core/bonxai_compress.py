@@ -26,7 +26,14 @@ def bonxai_compress(X, kernel_type, k_params=np.ones(1), g=0, num_bins=4,
         the input points. Otherwise minimizes MMD to the 0 measure; this
         is useful when the kernel has expectation zero under a target measure.
     """
+    if not isinstance(g, int) or g < 0:
+        raise ValueError(f"Invalid g={g!r}: must be a non-negative integer")
+    if not isinstance(num_bins, int) or num_bins < 0:
+        raise ValueError(f"Invalid num_bins={num_bins!r}: must be a non-negative integer")
+    
     n = X.shape[0]
+    if n <= 0:
+        raise ValueError("X must be non-empty")
     nearest_pow_four = compress.largest_power_of_four(n)
 
     if nearest_pow_four != n and m is not None:
