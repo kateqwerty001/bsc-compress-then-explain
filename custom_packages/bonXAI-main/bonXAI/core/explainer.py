@@ -180,7 +180,7 @@ class Explainer:
             n_jobs: int = None
         ) -> Tuple[np.ndarray, float]:
         print(f"Explaining with ShapIQ. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
-        start = time.time()
+
         if self.task_type == "regression":
             model_func = self.prediction_function
         elif self.task_type == "classification":
@@ -188,6 +188,8 @@ class Explainer:
                 proba = self.prediction_function(X)
                 preds = np.argmax(proba, axis=1)
                 return np.array([proba[i, preds[i]] for i in range(len(preds))])
+        else:
+            raise ValueError("task_type must be 'classification' or 'regression'")
 
         imputer = shapiq.MarginalImputer(
             model=model_func,
@@ -203,24 +205,27 @@ class Explainer:
             max_order=2,
             imputer=imputer
         )
-        main_effects = []
-        pairwise_list = []
 
-        for i in range(X_foreground.shape[0]):
-            iv = explainer.explain(X_foreground[i], budget=1024, random_state=self.seed)
+        def explain_single(i):
+            start = time.time()
+            iv = explainer.explain(X_foreground[i], budget=2048, random_state=self.seed)
             main = np.asarray(iv.get_n_order_values(1)).ravel()
-            main_effects.append(main)
             try:
                 pair = iv.get_n_order_values(2)
             except Exception:
                 pair = None
-                print("No pairwise interactions found for sample:", i)
-            pairwise_list.append(pair)
+            elapsed = time.time() - start
+            return main, pair, elapsed
 
+        results = joblib.Parallel(n_jobs=n_jobs)(
+            joblib.delayed(explain_single)(i) for i in range(X_foreground.shape[0])
+        )
+
+        main_effects, pairwise_list, times = zip(*results)
         self.main_effects = np.vstack(main_effects)
-        elapsed = time.time() - start
-        return pairwise_list, elapsed
+        total_elapsed = sum(times)
 
+        return pairwise_list, total_elapsed
 
     def _explain_expected_gradients(self,
             X_background: np.ndarray,
