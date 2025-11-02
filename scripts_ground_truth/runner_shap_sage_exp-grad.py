@@ -22,7 +22,7 @@ for model_name in model_names:
             if explainer_name == "sage":
                 mem_gb = "100G"
             elif explainer_name == "shap":
-                mem_gb = "100G"
+                mem_gb = "200G"
 
             job_name = f"{dataset_name}_{explainer_name}_{model_name}"
             sh_file = f"run_{job_name}.sh"
