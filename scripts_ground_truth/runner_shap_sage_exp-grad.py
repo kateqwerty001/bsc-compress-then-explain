@@ -8,8 +8,8 @@ from bonXAI.core.utils import CC18_SMALL, CTR23_SMALL
 model_names = ["ann", "xgboost"]
 
 explainers = [
-    ("shap", "kernel", 8),
-    # ("sage", "permutation", 8),
+    ("shap", "kernel", 16),
+    ("sage", "permutation", 16),
 ]
 
 print("[START] Generating and submitting SLURM jobs for small datasets \n")
@@ -53,9 +53,9 @@ for model_name in model_names:
   --n_jobs {n_jobs}
 """)
 
-        os.system(f"chmod +x {sh_file}")
-        os.system(f"sbatch {sh_file}")
-        print(f"--> Submitted job: {job_name}")
+            os.system(f"chmod +x {sh_file}")
+            os.system(f"sbatch {sh_file}")
+            print(f"--> Submitted job: {job_name}")
 
 
 # ============================================================
@@ -68,7 +68,7 @@ from bonXAI.core.utils import CC18_LARGE, CTR23_LARGE
 model_name = "ann"
 
 explainers = [
-    ("expected_gradients", "expected_gradients", 16),
+    ("expected_gradients", "na", 16),
 ]
 
 print("\n[START] Generating and submitting SLURM jobs for large datasets \n")
@@ -78,7 +78,7 @@ for dataset_id in CC18_LARGE + CTR23_LARGE:
     for explainer_name, strategy, n_jobs in explainers:
 
         if explainer_name == "expected_gradients":
-            mem_gb = "150G"
+            mem_gb = "50G"
 
         job_name = f"{dataset_name}_{explainer_name}_{model_name}"
         sh_file = f"run_{job_name}.sh"
