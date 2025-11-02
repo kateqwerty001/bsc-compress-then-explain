@@ -13,8 +13,9 @@ from bonXAI.core.pytorch_ann import PyTorchANN
 import shapiq
 from torch.utils.data import DataLoader, TensorDataset
 from pydvl.influence.torch import CgInfluence
+from bonXAI.core.utils import set_global_seed
 
-warnings.filterwarnings("ignore", category=UserWarning)
+# warnings.filterwarnings("ignore", category=UserWarning)
 try:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
@@ -59,9 +60,10 @@ class Explainer:
         self,
         X_foreground: np.ndarray,
         X_background: np.ndarray,
-        n_jobs: int,
+        n_jobs: int = None,
         y_foreground: Optional[np.ndarray] = None,
-        y_background: Optional[np.ndarray] = None
+        y_background: Optional[np.ndarray] = None, 
+        verbose: bool = True
     ) -> Tuple[np.ndarray, float]:
         """
         Generate explanations.
@@ -75,27 +77,36 @@ class Explainer:
         Returns:
             (explanation_values, time_elapsed)
         """
+        if n_jobs is None or n_jobs == -1:
+            n_jobs = joblib.cpu_count()
+            print(f"Using all available CPU cores for parallel processing: {n_jobs} cores.")
+        elif n_jobs > 0 and type(n_jobs) is int:
+            print(f"Using {n_jobs} CPU cores for parallel processing.")
+        else:
+            raise ValueError("n_jobs must be None, -1, or a positive integer.")
+
         if self.explainer_name == "shap":
-            return self._explain_shap(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
+            return self._explain_shap(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs, verbose=verbose)
         elif self.explainer_name == "sage":
             if y_foreground is None:
                 raise ValueError("SAGE explanation requires labels (y).")
-            return self._explain_sage(X_background=X_background, X_foreground=X_foreground, y_foreground=y_foreground, n_jobs=n_jobs)
+            return self._explain_sage(X_background=X_background, X_foreground=X_foreground, y_foreground=y_foreground, n_jobs=n_jobs, verbose=verbose)
         elif self.explainer_name == "expected_gradients":
-            return self._explain_expected_gradients(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
+            return self._explain_expected_gradients(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs, verbose=verbose)
         elif self.explainer_name == "shapiq":
-            return self._explain_shapiq(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs)
+            return self._explain_shapiq(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs, verbose=verbose)
         elif self.explainer_name == "influence":
             if y_foreground is None or y_background is None:
                 raise ValueError("Influence explanation requires both foreground and background labels (y).")
-            return self._explain_influence(X_background=X_background, y_background=y_background, X_foreground=X_foreground, y_foreground=y_foreground)
+            return self._explain_influence(X_background=X_background, y_background=y_background, X_foreground=X_foreground, y_foreground=y_foreground, n_jobs=n_jobs, verbose=verbose)
         raise RuntimeError("Invalid configuration.")
 
     def _explain_shap(
             self,
             X_background: np.ndarray, 
             X_foreground: np.ndarray, 
-            n_jobs: int = None, 
+            n_jobs: int, 
+            verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
         print(f"Explaining with SHAP. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
 
@@ -111,27 +122,31 @@ class Explainer:
 
         total_explanation_time = 0.0
 
-        if n_jobs is None:
+        # custom batching for parallel processing
+        BATCH_SIZE = 10
+        batches = [X_foreground[(i*BATCH_SIZE):(i+1)*BATCH_SIZE] for i in range(int(1+X_foreground.shape[0]/BATCH_SIZE))]
+
+        if verbose:
+            print(f"Running SHAP explanation in parallel using {n_jobs} jobs, {len(batches)} batches of size {BATCH_SIZE}")
+
+        def run_batch(batch, batch_idx):
+            set_global_seed(self.seed + batch_idx)
+            nonlocal total_explanation_time
             start = time.time()
-            shap_values = explainer(X_foreground, silent=True)
-            total_explanation_time = time.time() - start + initialization_time
-        else:
-            BATCH_SIZE = 10
-            batches = [X_foreground[(i*BATCH_SIZE):(i+1)*BATCH_SIZE] for i in range(int(1+X_foreground.shape[0]/BATCH_SIZE))]
+            shap_values = explainer(batch, silent=True).values
+            batch_time = time.time() - start
+            if verbose:
+                print(f"  → Finished batch {batch_idx + 1}/{len(batches)}")
+            return shap_values, batch_time
+        
+        results = joblib.Parallel(n_jobs=n_jobs)(
+            joblib.delayed(run_batch)(batch, idx) for idx, batch in enumerate(batches) if batch.shape[0] > 0
+        )
 
-            def run_batch(batch):
-                nonlocal total_explanation_time
-                start = time.time()
-                shap_values = explainer(batch, silent=True).values
-                batch_time = time.time() - start
-                return shap_values, batch_time
-            
-            results = joblib.Parallel(n_jobs=n_jobs)(
-                joblib.delayed(run_batch)(batch) for batch in batches if batch.shape[0] > 0
-            )
-
-            shap_values = np.concatenate([sv for sv, _ in results], axis=0)
-            total_explanation_time = sum(batch_time for _, batch_time in results) + initialization_time
+        shap_values = np.concatenate([sv for sv, _ in results], axis=0)
+        total_explanation_time = sum(batch_time for _, batch_time in results) + initialization_time
+        if verbose:
+            print(f"  → Finished all {X_foreground.shape[0]} samples")
 
         if self.task_type == "classification":
             predictions = self.prediction_function(X_foreground)
@@ -141,12 +156,14 @@ class Explainer:
 
         return shap_values, total_explanation_time
 
+
     def _explain_sage(
             self,
             X_background: np.ndarray,
             X_foreground: np.ndarray,
             y_foreground: np.ndarray, 
-            n_jobs: int = 16
+            n_jobs: int, 
+            verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
         print(f"Explaining with SAGE. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
         
@@ -167,8 +184,8 @@ class Explainer:
                 explainer = sage.PermutationEstimator(imputer, loss=self.loss, random_state=self.seed, n_jobs=n_jobs)
         else:
             raise ValueError(f"Unknown strategy for SAGE: {self.strategy}")
-
-        sage_values = explainer(X_foreground, y_foreground, bar=False, verbose=False).values
+        
+        sage_values = explainer(X_foreground, y_foreground, bar=False, verbose=verbose).values
         end = time.time()
         elapsed = end - start
         return sage_values, elapsed
@@ -177,7 +194,8 @@ class Explainer:
             self,
             X_background: np.ndarray,
             X_foreground: np.ndarray,
-            n_jobs: int = None
+            n_jobs: int, 
+            verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
         print(f"Explaining with ShapIQ. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
 
@@ -207,6 +225,7 @@ class Explainer:
         )
 
         def explain_single(i):
+            set_global_seed(self.seed + i)
             start = time.time()
             iv = explainer.explain(X_foreground[i], budget=2048, random_state=self.seed)
             main = np.asarray(iv.get_n_order_values(1)).ravel()
@@ -215,6 +234,8 @@ class Explainer:
             except Exception:
                 pair = None
             elapsed = time.time() - start
+            if verbose:
+                print(f"  → Finished sample {i + 1}/{X_foreground.shape[0]}")
             return main, pair, elapsed
 
         results = joblib.Parallel(n_jobs=n_jobs)(
@@ -226,11 +247,13 @@ class Explainer:
         total_elapsed = sum(times)
 
         return pairwise_list, total_elapsed
-
-    def _explain_expected_gradients(self,
+    
+    def _explain_expected_gradients(
+            self,
             X_background: np.ndarray,
             X_foreground: np.ndarray,
-            n_jobs: int = 8
+            n_jobs: int = None, 
+            verbose: bool = True
         ):
         print(f"Explaining with Expected Gradients. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
         start = time.time()
@@ -244,42 +267,52 @@ class Explainer:
 
         explanations = []
 
+        def explain_sample(i, target_class=None):
+            set_global_seed(self.seed + i) 
+            x_sample = inputs[i:i+1]
+
+            tasks = []
+            for j in range(baselines.shape[0]):
+                seed_j = self.seed + i * baselines.shape[0] + j
+                set_global_seed(seed_j)
+                if target_class is not None:
+                    tasks.append(joblib.delayed(explainer.attribute)(x_sample, baselines[[j]], target=int(target_class)))
+                else:
+                    tasks.append(joblib.delayed(explainer.attribute)(x_sample, baselines[[j]]))
+
+            results = joblib.Parallel(n_jobs=n_jobs)(tasks)
+            explanation = torch.mean(torch.stack(results), dim=0)
+            return explanation.detach().cpu().numpy().ravel()
+
         if self.task_type == "classification":
             predictions = self.prediction_function(X_foreground)
             predicted_classes = np.argmax(predictions, axis=1)
 
+            if verbose:
+                print(f"Running Expected Gradients for {len(inputs)} samples (classification).")
+
             for i, target_class in enumerate(predicted_classes):
-                x_sample = inputs[i : i + 1]
-                tasks = [
-                    joblib.delayed(explainer.attribute)(
-                        x_sample,
-                        baselines[[j]],
-                        target=int(target_class)
-                    )
-                    for j in range(baselines.shape[0])
-                ]
-                results = joblib.Parallel(n_jobs=n_jobs)(tasks)
-                explanation = torch.mean(torch.stack(results), dim=0)
-                explanations.append(explanation.detach().cpu().numpy().ravel())
+                explanations.append(explain_sample(i, target_class))
+                if verbose:
+                    print(f"  → Finished sample {i + 1}/{len(inputs)}")
 
         elif self.task_type == "regression":
+            if verbose:
+                print(f"Running Expected Gradients for {len(inputs)} samples (regression).")
+
             for i in range(inputs.shape[0]):
-                x_sample = inputs[i : i + 1]
-                tasks = [
-                    joblib.delayed(explainer.attribute)(
-                        x_sample,
-                        baselines[[j]]
-                    )
-                    for j in range(baselines.shape[0])
-                ]
-                results = joblib.Parallel(n_jobs=n_jobs)(tasks)
-                explanation = torch.mean(torch.stack(results), dim=0)
-                explanations.append(explanation.detach().cpu().numpy().ravel())
+                explanations.append(explain_sample(i))
+                if verbose:
+                    print(f"  → Finished sample {i + 1}/{len(inputs)}")
+
         else:
             raise ValueError("task_type must be 'classification' or 'regression'")
 
         final_explanations = torch.tensor(explanations, dtype=torch.float32)
         elapsed = time.time() - start
+
+        if verbose:
+            print(f"Done. Explained {len(inputs)} samples.")
 
         return final_explanations, elapsed
 
@@ -288,7 +321,9 @@ class Explainer:
             X_background: np.ndarray,
             y_background: np.ndarray,
             X_foreground: np.ndarray,
-            y_foreground: np.ndarray
+            y_foreground: np.ndarray, 
+            n_jobs: int = None,
+            verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
         if isinstance(self.model, PyTorchANN):
             model = self.model.model_  
