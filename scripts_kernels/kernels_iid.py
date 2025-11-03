@@ -23,7 +23,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
     N_REPEATS = 20
     set_global_seed(seed)
 
-    gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/package_metadata/{dataset_name}/ground_truth/explanations_{explainer_name}_{strategy}_3_repeats.npz")
+    gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/ground_truth/package_metadata/openml/{dataset_name}/ground_truth/{explainer_name}_{strategy}_3_{model_name}.npz")
     gt_exp_values, gt_times = gt["exp_values"], gt["times"]
 
     mean_gt_exp_values = np.mean(gt_exp_values, axis=0) # Average over repeats
@@ -44,7 +44,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                     model=model,
                     compression_method="kernel_thinning",
                     data_modification_method="none",
-                    seed=seed + i + np.abs(m) + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6)
+                    seed=int(seed + i + np.abs(m) + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6))
                 )
                 print(f"Repeat {i+1}/{N_REPEATS}, Kernel: {kernel}, m={m}")
                 if  counter <= 0:
@@ -67,9 +67,10 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                 start = time.time()
                 explainer = Explainer(
                     model=model,
+                    task_type=task_type,
                     explainer_name=explainer_name,
                     strategy=strategy,
-                    seed=seed + i + np.abs(m) + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6)
+                    seed=int(seed + i + np.abs(m) + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6))
                 )
 
                 exp_values, time_ = explainer.explain(X_foreground=X_foreground, X_background=X_kt, y_foreground=y_foreground, n_jobs=n_jobs)
@@ -108,6 +109,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
             start = time.time()
             explainer = Explainer(
                 model=model,
+                task_type=task_type,
                 explainer_name=explainer_name,
                 strategy=strategy,
                 seed=seed + j + i
@@ -130,9 +132,9 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
             results.append(row)
 
     df = pd.DataFrame(results)
-    save_dir = f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/package_metadata/{dataset_name}/kernels_iid_comparison/"
+    save_dir = f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/ground_truth/package_metadata/openml/{dataset_name}/kernels_iid_comparison/"
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"results_{explainer_name}_{strategy}_kernels_and_iid_comparison.csv")
+    save_path = os.path.join(save_dir, f"{explainer_name}_{strategy}_{model_name}_kernels_iid.csv")
 
     df.to_csv(save_path, index=False)
     print(f"Saved results to {save_path}")
