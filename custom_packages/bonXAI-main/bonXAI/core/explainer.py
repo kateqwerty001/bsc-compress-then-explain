@@ -130,7 +130,7 @@ class Explainer:
             print(f"Running SHAP explanation in parallel using {n_jobs} jobs, {len(batches)} batches of size {BATCH_SIZE}")
 
         def run_batch(batch, batch_idx):
-            set_global_seed(self.seed + batch_idx)
+            set_global_seed(int(self.seed + batch_idx))
             nonlocal total_explanation_time
             start = time.time()
             shap_values = explainer(batch, silent=True).values
@@ -225,7 +225,7 @@ class Explainer:
         )
 
         def explain_single(i):
-            set_global_seed(self.seed + i)
+            set_global_seed(int(self.seed + i))
             start = time.time()
             iv = explainer.explain(X_foreground[i], budget=2048, random_state=self.seed)
             main = np.asarray(iv.get_n_order_values(1)).ravel()
