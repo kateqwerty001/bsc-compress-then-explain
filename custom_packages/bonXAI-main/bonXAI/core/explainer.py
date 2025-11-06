@@ -239,7 +239,7 @@ class Explainer:
             return main, pair, elapsed
 
         results = joblib.Parallel(n_jobs=n_jobs)(
-            joblib.delayed(explain_single)(i) for i in range(X_foreground.shape[0])
+            joblib.delayed(explain_single)(int(i)) for i in range(X_foreground.shape[0])
         )
 
         main_effects, pairwise_list, times = zip(*results)
@@ -301,7 +301,7 @@ class Explainer:
                 print(f"Running Expected Gradients for {len(inputs)} samples (regression).")
 
             for i in range(inputs.shape[0]):
-                explanations.append(explain_sample(i))
+                explanations.append(explain_sample(int(i)))
                 if verbose:
                     print(f"  → Finished sample {i + 1}/{len(inputs)}")
 
