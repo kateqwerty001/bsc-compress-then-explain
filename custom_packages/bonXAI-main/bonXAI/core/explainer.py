@@ -268,13 +268,13 @@ class Explainer:
         explanations = []
 
         def explain_sample(i, target_class=None):
-            set_global_seed(self.seed + i) 
+            set_global_seed(int(self.seed + i))
             x_sample = inputs[i:i+1]
 
             tasks = []
             for j in range(baselines.shape[0]):
                 seed_j = self.seed + i * baselines.shape[0] + j
-                set_global_seed(seed_j)
+                set_global_seed(int(seed_j))
                 if target_class is not None:
                     tasks.append(joblib.delayed(explainer.attribute)(x_sample, baselines[[j]], target=int(target_class)))
                 else:
