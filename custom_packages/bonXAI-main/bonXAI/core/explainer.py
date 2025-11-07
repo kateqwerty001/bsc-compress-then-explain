@@ -227,7 +227,7 @@ class Explainer:
         def explain_single(i):
             set_global_seed(int(self.seed + i))
             start = time.time()
-            iv = explainer.explain(X_foreground[i], budget=2048, random_state=self.seed)
+            iv = explainer.explain(X_foreground[i], budget=2048, random_state=int(self.seed + i))
             main = np.asarray(iv.get_n_order_values(1)).ravel()
             try:
                 pair = iv.get_n_order_values(2)
