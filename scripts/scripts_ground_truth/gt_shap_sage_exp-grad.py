@@ -99,6 +99,7 @@ if __name__ == "__main__":
     if (
         (args.explainer_name == "shap" and args.strategy == "kernel")
         or (args.explainer_name == "expected_gradients" and args.strategy == "na")
+        or (args.explainer_name == "shapiq" and args.strategy == "kernel")
     ) and len(X_test) > 4096:
         rng_fg = np.random.default_rng(int(args.dataset_id))
         ids_fg = rng_fg.choice(len(X_test), size=4096, replace=False)

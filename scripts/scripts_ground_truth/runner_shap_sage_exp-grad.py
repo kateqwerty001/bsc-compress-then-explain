@@ -8,8 +8,9 @@ from bonXAI.core.utils import CC18_SMALL, CTR23_SMALL
 model_names = ["ann", "xgboost"]
 
 explainers = [
-    ("shap", "kernel", 16),
-    ("sage", "permutation", 16),
+    # ("shap", "kernel", 16),
+    # ("sage", "permutation", 16),
+    ("shapiq", "kernel", 16),
 ]
 
 print("[START] Generating and submitting SLURM jobs for small datasets \n")
@@ -21,8 +22,8 @@ for model_name in model_names:
             
             if explainer_name == "sage":
                 mem_gb = "100G"
-            elif explainer_name == "shap":
-                mem_gb = "200G"
+            elif explainer_name == "shap" or explainer_name == "shapiq":
+                mem_gb = "100G"
 
             job_name = f"{dataset_name}_{explainer_name}_{model_name}"
             sh_file = f"run_{job_name}.sh"
