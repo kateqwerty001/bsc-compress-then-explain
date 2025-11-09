@@ -6,6 +6,8 @@ import openml
 from openxai.model import LoadModel, ReturnLoaders
 from sklearn.model_selection import train_test_split
 import torch
+import numpy as np
+from scipy.spatial.distance import pdist
 
 # CTR23 benchmark suite - regression tasks
 CTR23_ALL = [44956, 44957, 44958, 44990, 44977, 44994, 44959, 44984, 44978, 44979, 44960, 45012, 
@@ -83,3 +85,15 @@ def compresspp_kt_output_size(X: np.ndarray) -> int:
         raise ValueError("X must be non-empty")
     n_prime = 4 ** int(np.floor(np.log(n) / np.log(4)))
     return int(np.sqrt(n_prime))
+
+
+def median_pairwise_distance_sample(X, n_pairs=100_000, random_state=None):
+    rng = np.random.default_rng(random_state)
+    n = X.shape[0]
+    if n*(n-1)//2 <= n_pairs:
+        return np.median(pdist(X))
+    i = rng.integers(0, n, n_pairs)
+    j = rng.integers(0, n, n_pairs)
+    mask = i != j
+    d = np.linalg.norm(X[i[mask]] - X[j[mask]], axis=1)
+    return np.median(d)

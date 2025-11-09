@@ -209,7 +209,7 @@ class Preprocessor:
         Call the selected compression on (X_mod, y_mod).
         """
         compressor = Compressor(X_mod, y_mod, self.model, seed=self.seed)
-        kernel_type, k_params = resolve_kernel_params(kernel, X_mod)
+        kernel_type, k_params = resolve_kernel_params(kernel, X_mod, seed=self.seed)
 
         if self.compression_method == "kernel_thinning":
             return compressor._kernel_thinning(g, num_bins, m, delta, kernel_type, k_params)
