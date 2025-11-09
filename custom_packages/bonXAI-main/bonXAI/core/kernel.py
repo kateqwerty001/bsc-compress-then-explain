@@ -25,9 +25,8 @@ def resolve_kernel_params(name: str, X: np.ndarray, seed: int) -> Tuple[bytes, n
     
     elif name == "matern":
         print("Calculating Matérn (sum of 3 kernels) ")
-        k_params = np.array([1.0, ell, 0.5, 1.0, ell, 1.5, 1.0, ell, 2.5], dtype=np.float64)
+        k_params = np.array([1.0, ell * 0.5, 0.5, 1.0, ell * 1, 1.5, 1.0, ell * 2, 2.5], dtype=np.float64)
         return b"matern", k_params
 
-    
     else:
         raise ValueError(f"Unknown kernel: {name}")
