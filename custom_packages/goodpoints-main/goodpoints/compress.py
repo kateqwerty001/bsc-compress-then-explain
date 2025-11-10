@@ -71,9 +71,6 @@ def compresspp_kt(X, kernel_type, k_params=np.ones(1), g=0, num_bins=4,
         compressc.compute_K(X, np.arange(n, dtype=int), kernel_type, k_params, 
                             K)
         
-        print("Kernel matrix K stats (before thin_K):")
-        print("min:", K.min(), "max:", K.max(), "mean:", K.mean(), "std:", K.std())
-        print("K first 5x5 block:\n", K[:5, :5])
         return kt.thin_K(K, K, log2_sqrtn, delta=delta, seed=seed, mean0=mean0)
         
     # Otherwise, divide failure probability between Compress and Thin rounds
@@ -105,9 +102,6 @@ def compresspp_kt(X, kernel_type, k_params=np.ones(1), g=0, num_bins=4,
     compressc.compute_K(X, compress_coreset, kernel_type, k_params, K)
     # Use target kt.thin to reduce coreset size from 2^g * sqrt(n * num_bins)
     # to sqrt(n)
-    print("Kernel matrix K stats (before thin_K):")
-    print("min:", K.min(), "max:", K.max(), "mean:", K.mean(), "std:", K.std())
-    print("K first 5x5 block:\n", K[:5, :5])
     return compress_coreset[ 
         kt.thin_K(K, K, m, delta=thin_delta, seed=thin_seed, mean0=mean0)]
 
