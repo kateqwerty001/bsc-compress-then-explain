@@ -9,18 +9,21 @@ from bonXAI.core.evaluation import Evaluator
 from bonXAI.core.utils import set_global_seed
 from openxai.model import LoadModel, ReturnLoaders
 from bonXAI.core.data_loader import DataLoader
+from goodpoints import compress
 from bonXAI.core.utils import CC18_ALL, CTR23_ALL
 import argparse
 import hashlib
+import math
 
 sys.stdout.reconfigure(line_buffering=True)
 
-kernels = ["gaussian", "sobolev", "inverse_multiquadric",
-            "matern_0.5", "matern_1.5", "matern_2.5"]
+kernels = ["gaussian", "sobolev", "inverse_multiquadric", "matern"]
+coefficients = [1/4, 1/2, 1, 2, 4]
 
 
 def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, seed, n_jobs):
-    N_REPEATS = 20
+    N_REPEATS = 10
+    basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test))))
     set_global_seed(seed)
 
     gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/ground_truth/package_metadata/openml/{dataset_name}/ground_truth/{explainer_name}_{strategy}_3_{model_name}.npz")
@@ -34,35 +37,24 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
 
     print("\n[INFO] Running Kernel Thinning for different kernels...")
     for i in range(N_REPEATS):
-        prev_size = -1
         for kernel in kernels:
-            counter = 3
-            for m in range(15, -10, -1):
+            for target_size in [basic_size * coeff for coeff in coefficients]:
                 pre = Preprocessor(
                     X=X_test.copy(),
                     y=y_test.copy(),
                     model=model,
                     compression_method="kernel_thinning",
                     data_modification_method="none",
-                    seed=int(seed + i + np.abs(m) + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6))
+                    seed=seed + i + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6)
                 )
-                print(f"Repeat {i+1}/{N_REPEATS}, Kernel: {kernel}, m={m}")
-                if  counter <= 0:
-                    continue
-
-                try:
-                    X_kt, y_kt, idx_kt, t_kt = pre._preprocess(
-                        g=4,
-                        num_bins=32,
-                        m=m,
-                        kernel=kernel
-                    )
-                    
-                except Exception as e:
-                    continue
-
-                if len(X_kt) == prev_size:
-                    continue
+                print(f"Repeat {i+1}/{N_REPEATS}, Kernel: {kernel}, Target Size: {target_size}")
+                
+                X_kt, y_kt, idx_kt, t_kt = pre._preprocess(
+                    g=4,
+                    num_bins=32,
+                    target_size=target_size,                        
+                    kernel=kernel
+                )
 
                 start = time.time()
                 explainer = Explainer(
@@ -70,10 +62,11 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                     task_type=task_type,
                     explainer_name=explainer_name,
                     strategy=strategy,
-                    seed=int(seed + i + np.abs(m) + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6))
+                    seed=int(seed + i + target_size + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6))
                 )
 
                 exp_values, time_ = explainer.explain(X_foreground=X_foreground, X_background=X_kt, y_foreground=y_foreground, n_jobs=n_jobs)
+                t_exp = time.time() - start
 
                 row = evaluator.evaluate_explanation(exp_values, time_, len(X_kt))
                 row.update(evaluator.evaluate_compression(X_kt))
@@ -84,14 +77,12 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                     "kernel": kernel,
                     "g": 4,
                     "num_bins": 32,
-                    "m": m,
+                    "target_size": target_size,
                     "compression_time": t_kt,
-                    "explanation_time": time.time() - start,
-
+                    "explanation_time": t_exp,
+                    "unique_samples": len(np.unique(idx_kt)),
                 })
                 results.append(row)
-                prev_size = len(X_kt)
-                counter-=1
 
     print("\n[INFO] Running IID Baseline...")
     sizes = pd.DataFrame(results)["size"].unique()
@@ -125,9 +116,10 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                 "kernel": "none",
                 "g": None,
                 "num_bins": None,
-                "m": None,
+                "target_size": target_size,
                 "compression_time": t_iid,
                 "explanation_time": time.time() - start,
+                "unique_samples": len(np.unique(idx_iid)),
             })
             results.append(row)
 
@@ -166,6 +158,7 @@ if __name__ == "__main__":
     if (
         (args.explainer_name == "shap" and args.strategy == "kernel")
         or (args.explainer_name == "expected_gradients" and args.strategy == "na")
+        or (args.explainer_name == "shapiq" and args.strategy == "na")
     ) and len(X_test) > 4096:
         rng_fg = np.random.default_rng(int(args.dataset_id))
         ids_fg = rng_fg.choice(len(X_test), size=4096, replace=False)
