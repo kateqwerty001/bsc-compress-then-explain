@@ -43,7 +43,6 @@ def bonxai_compress(X, kernel_type, k_params=np.ones(1), g=4, num_bins=32,
 
     if sqrt_nearest_pow_four == target_size:
         if log2_target_size <= m:
-            print("No compress")
             K = np.empty((n, n))
             compressc.compute_K(X, np.arange(n, dtype=int), kernel_type, k_params, 
                                 K)
