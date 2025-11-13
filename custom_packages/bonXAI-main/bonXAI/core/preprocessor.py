@@ -31,10 +31,10 @@ class Compressor:
         self.seed = seed
 
     def _kernel_thinning(
-        self, g: int, num_bins: int, m: int, delta: float, kernel_type: bytes, k_params: np.ndarray
+        self, g: int, num_bins: int, target_size: int, delta: float, kernel_type: bytes, k_params: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
         start = time.time()
-        indices = bonxai_compress(self.X, kernel_type, k_params, g=g, num_bins=num_bins, m=m, delta=delta, seed=self.seed)
+        indices = bonxai_compress(self.X, kernel_type, k_params, g=g, num_bins=num_bins, target_size = target_size, delta=delta, seed=self.seed)
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
     
@@ -212,7 +212,7 @@ class Preprocessor:
         kernel_type, k_params = resolve_kernel_params(kernel, X_mod, seed=self.seed)
 
         if self.compression_method == "kernel_thinning":
-            return compressor._kernel_thinning(g, num_bins, m, delta, kernel_type, k_params)
+            return compressor._kernel_thinning(g, num_bins, target_size, delta, kernel_type, k_params)
 
         elif self.compression_method == "stein_thinning":
             return compressor._stein_thinning(m, kernel_type, grad)
