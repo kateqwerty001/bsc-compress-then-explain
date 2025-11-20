@@ -17,11 +17,12 @@ import math
 
 sys.stdout.reconfigure(line_buffering=True)
 
-kernels = ["gaussian", "sobolev", "inverse_multiquadric", "matern"]
-coefficients = [1/4, 1/2, 1, 2, 4]
+coefficients = [1/4, 1/2, 1, 2, 4] # target size coefficients
 
 
-def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, seed, n_jobs):
+def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, data_modification_method, compression_method, seed, n_jobs):
+    print(f"[INFO] Running experiment for explainer: {explainer_name}, strategy: {strategy}, model: {model_name}, dataset: {dataset_name} - compression: {compression_method}, data modification: {data_modification_method}")
+
     N_REPEATS = 10
     basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test))))
     set_global_seed(seed)
@@ -35,93 +36,59 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
 
     results = []
 
-    print("\n[INFO] Running Kernel Thinning for different kernels...")
+    print(f"[INFO] Running {explainer_name}-{strategy} ({compression_method}, {data_modification_method}) on dataset: {dataset_name}")
     for i in range(N_REPEATS):
-        for kernel in kernels:
-            for target_size in [basic_size * coeff for coeff in coefficients]:
-                pre = Preprocessor(
-                    X=X_test.copy(),
-                    y=y_test.copy(),
-                    model=model,
-                    compression_method="kernel_thinning",
-                    data_modification_method="none",
-                    seed=seed + i + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6)
-                )
-                print(f"Repeat {i+1}/{N_REPEATS}, Kernel: {kernel}, Target Size: {target_size}")
-                
-                X_kt, y_kt, idx_kt, t_kt = pre._preprocess(
-                    g=4,
-                    num_bins=32,
-                    target_size=target_size,                        
-                    kernel=kernel
-                )
-
-                explainer = Explainer(
-                    model=model,
-                    task_type=task_type,
-                    explainer_name=explainer_name,
-                    strategy=strategy,
-                    seed=int(seed + i + target_size + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6))
-                )
-
-                exp_values, t_exp = explainer.explain(X_foreground=X_foreground, X_background=X_kt, y_foreground=y_foreground, n_jobs=n_jobs)
-
-                row = evaluator.evaluate_explanation(exp_values, t_exp, len(X_kt))
-                row.update(evaluator.evaluate_compression(X_kt))
-                row.update({
-                    "explainer": explainer_name,
-                    "strategy": strategy,
-                    "method": "kernel_thinning",
-                    "kernel": kernel,
-                    "g": 4,
-                    "num_bins": 32,
-                    "target_size": target_size,
-                    "compression_time": t_kt,
-                    "unique_samples": len(np.unique(idx_kt)),
-                })
-                results.append(row)
-
-    print("\n[INFO] Running IID Baseline...")
-    sizes = pd.DataFrame(results)["size"].unique()
-    for i in sizes:
-        for j in range(N_REPEATS):
+        for target_size in [basic_size * coeff for coeff in coefficients]:
+            target_size = int(target_size)
             pre = Preprocessor(
                 X=X_test.copy(),
                 y=y_test.copy(),
                 model=model,
-                compression_method="iid",
-                data_modification_method="none",
-                seed=seed + j + i
+                compression_method=compression_method,
+                data_modification_method=data_modification_method,
+                seed=int(seed + i + target_size)
             )
-            X_iid, y_iid, idx_iid, t_iid = pre._preprocess(target_size=i)
+            print(f"Repeat {i+1}/{N_REPEATS}, target size: {target_size}")
+            
+            if compression_method == "stein_thinning":
+                X_comp, y_comp, idx_comp, t_comp = pre._preprocess(
+                    target_size=target_size, 
+                    grad_type=b'gaussian'
+                )
+            else:
+                X_comp, y_comp, idx_comp, t_comp = pre._preprocess(
+                    target_size=target_size
+                )
+
             explainer = Explainer(
                 model=model,
                 task_type=task_type,
                 explainer_name=explainer_name,
                 strategy=strategy,
-                seed=seed + j + i
+                seed=int(seed + i + target_size)
             )
-            exp_values, t_exp = explainer.explain(X_foreground=X_foreground, X_background=X_iid, y_foreground=y_foreground, n_jobs=n_jobs)
-            
-            row = evaluator.evaluate_explanation(exp_values, t_exp, len(X_iid))
-            row.update(evaluator.evaluate_compression(X_iid))
+
+            exp_values, t_exp = explainer.explain(X_foreground=X_foreground, X_background=X_comp, y_foreground=y_foreground, n_jobs=n_jobs)
+
+            row = evaluator.evaluate_explanation(exp_values, t_exp, len(X_comp))
+            row.update(evaluator.evaluate_compression(X_comp))
             row.update({
                 "explainer": explainer_name,
                 "strategy": strategy,
-                "method": "iid",
+                "method": compression_method,
                 "kernel": "Not needed",
                 "g": "Not needed",
                 "num_bins": "Not needed",
-                "target_size": i,
-                "compression_time": t_iid,
-                "unique_samples": len(np.unique(idx_iid)),
+                "target_size": target_size,
+                "compression_time": t_comp,
+                "unique_samples": len(np.unique(idx_comp)),
             })
             results.append(row)
 
     df = pd.DataFrame(results)
-    save_dir = f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/ground_truth/package_metadata/openml/{dataset_name}/kernels_iid_comparison/"
+    save_dir = f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/ground_truth/package_metadata/openml/{dataset_name}/other_baselines/"
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, f"{explainer_name}_{strategy}_{model_name}_kernels_iid_{seed}_{N_REPEATS}.csv")
+    save_path = os.path.join(save_dir, f"{compression_method}_{data_modification_method}_{explainer_name}_{strategy}_{model_name}_{seed}_{N_REPEATS}.csv")
 
     df.to_csv(save_path, index=False)
     print(f"Saved results to {save_path}")
@@ -133,8 +100,14 @@ if __name__ == "__main__":
     parser.add_argument("--model_name", type=str, required=True)
     parser.add_argument("--explainer_name", type=str, required=True)
     parser.add_argument("--strategy", type=str, required=True)
+    parser.add_argument("--compression_method", type=str, required=True)
+    parser.add_argument("--data_modification_method", type=str, required=True)
     parser.add_argument("--n_jobs", type=int, required=True)
+    parser.add_argument("--seed", type=int, required=True)
     args = parser.parse_args()
+
+    if args.data_modification_method != "none" and args.compression_method != "kernel_thinning":
+        raise ValueError("Data modification method can be used only with kernel thinning compression method.")
 
     set_global_seed(0)
 
@@ -173,7 +146,7 @@ if __name__ == "__main__":
         raise ValueError(f"Dataset ID {args.dataset_id} not found in CC18 or CTR23 benchmarks.")
 
     print(f"[INFO] Starting {args.explainer_name}-{args.strategy} for dataset: {dataset_name}")
-    run_pipeline_with_kernels_and_iid(
+    run_experiment_for_5_sizes(
         dataset_name=dataset_name,
         X_test=X_test, 
         y_test=y_test,
@@ -184,6 +157,8 @@ if __name__ == "__main__":
         explainer_name=args.explainer_name,
         strategy=args.strategy,
         task_type=task_type,
-        seed=42,
+        data_modification_method=args.data_modification_method,
+        compression_method=args.compression_method,
+        seed=int(args.seed),
         n_jobs=int(args.n_jobs),
     )
