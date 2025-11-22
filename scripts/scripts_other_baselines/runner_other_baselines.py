@@ -30,7 +30,7 @@ for data_modification in data_modification_method:
                     
                     mem_gb = "50G"
 
-                    job_name = f"k_{dataset_name}_{explainer_name}_{model_name}_{compression_method}_{data_modification}"
+                    job_name = f"st_{dataset_name}_{explainer_name}_{model_name}_{compression_method}_{data_modification}"
                     sh_file = f"run_{job_name}.sh"
 
                     path_to_script = "/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/scripts_other_baselines/other_baselines.py"

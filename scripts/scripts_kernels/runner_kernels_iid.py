@@ -5,11 +5,15 @@
 import os
 from bonXAI.core.utils import CC18_SMALL, CTR23_SMALL
 
+seed = 42
+n_repeats = 5
+
 model_names = ["ann", "xgboost"]
 
 explainers = [
     ("shap", "kernel", 16),
     ("sage", "permutation", 16),
+    ("shapiq", "kernel", 16)
 ]
 
 print("[START] Generating and submitting SLURM jobs for small datasets \n")
@@ -19,11 +23,7 @@ for model_name in model_names:
     for dataset_id in CC18_SMALL + CTR23_SMALL:
         dataset_name = f"{dataset_id}"
         for explainer_name, strategy, n_jobs in explainers:
-            
-            if explainer_name == "sage":
-                mem_gb = "100G"
-            elif explainer_name == "shap":
-                mem_gb = "100G"
+            mem_gb = "100G"
 
             job_name = f"k_{dataset_name}_{explainer_name}_{model_name}"
             sh_file = f"run_{job_name}.sh"
@@ -51,7 +51,9 @@ for model_name in model_names:
   --model_name {model_name} \\
   --explainer_name {explainer_name} \\
   --strategy {strategy} \\
-  --n_jobs {n_jobs}
+  --n_jobs {n_jobs} \\
+  --n_repeats {n_repeats} \\
+  --seed {seed} 
 """)
 
             os.system(f"chmod +x {sh_file}")
@@ -109,7 +111,9 @@ for dataset_id in CC18_LARGE + CTR23_LARGE:
   --model_name {model_name} \\
   --explainer_name {explainer_name} \\
   --strategy {strategy} \\
-  --n_jobs {n_jobs}
+  --n_jobs {n_jobs} \\
+  --n_repeats {n_repeats} \\
+  --seed {seed} 
 """)
 
         os.system(f"chmod +x {sh_file}")

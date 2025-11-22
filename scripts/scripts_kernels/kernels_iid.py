@@ -21,8 +21,8 @@ kernels = ["gaussian", "sobolev", "inverse_multiquadric", "matern"]
 coefficients = [1/4, 1/2, 1, 2, 4]
 
 
-def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, seed, n_jobs):
-    N_REPEATS = 10
+def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, seed, n_jobs, n_repeats):
+    N_REPEATS = n_repeats
     basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test))))
     set_global_seed(seed)
 
@@ -134,6 +134,8 @@ if __name__ == "__main__":
     parser.add_argument("--explainer_name", type=str, required=True)
     parser.add_argument("--strategy", type=str, required=True)
     parser.add_argument("--n_jobs", type=int, required=True)
+    parser.add_argument("--n_repeats", type=int, required=True)
+    parser.add_argument("--seed", type=int, required=True)
     args = parser.parse_args()
 
     set_global_seed(0)
@@ -184,6 +186,7 @@ if __name__ == "__main__":
         explainer_name=args.explainer_name,
         strategy=args.strategy,
         task_type=task_type,
-        seed=42,
+        seed=int(args.seed),
         n_jobs=int(args.n_jobs),
+        n_repeats=int(args.n_repeats),
     )
