@@ -6,7 +6,7 @@ import os
 from bonXAI.core.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
-n_repeats = 5
+n_repeats = 10
 
 model_names = ["ann", "xgboost"]
 
@@ -44,6 +44,9 @@ for model_name in model_names:
 #SBATCH --output=logs/{job_name}_log.txt
 #SBATCH --error=logs/{job_name}_err.txt
 #SBATCH --cpus-per-task={n_jobs}
+#SBATCH --gres=gpu:0
+#SBATCH --mail-user=kateqwerty001@gmail.com
+#SBATCH --mail-type=ALL
 
 # Run the Python script with all arguments
 {path_to_python} {path_to_script} \\
@@ -104,6 +107,9 @@ for dataset_id in CC18_LARGE + CTR23_LARGE:
 #SBATCH --output=logs/{job_name}_log.txt
 #SBATCH --error=logs/{job_name}_err.txt
 #SBATCH --cpus-per-task={n_jobs}
+#SBATCH --gres=gpu:0
+#SBATCH --mail-user=kateqwerty001@gmail.com
+#SBATCH --mail-type=ALL
 
 # Run the Python script with all arguments
 {path_to_python} {path_to_script} \\
