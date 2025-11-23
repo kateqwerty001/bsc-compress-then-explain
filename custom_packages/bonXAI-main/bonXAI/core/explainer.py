@@ -2,11 +2,9 @@ import time
 import numpy as np
 from typing import Optional, Tuple
 import shap
-import warnings
 import sys
 import sage
 import torch
-import torch.nn.functional as F
 import joblib
 import captum
 from bonXAI.core.pytorch_ann import PyTorchANN
@@ -15,7 +13,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from pydvl.influence.torch import CgInfluence
 from bonXAI.core.utils import set_global_seed
 
-# warnings.filterwarnings("ignore", category=UserWarning)
 try:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
@@ -25,16 +22,8 @@ except Exception:
 
 class Explainer:
     """
-    Unified interface for SHAP, SAGE and Shapiq explanation methods.
-
-    Parameters:
-        model: classifier with predict_proba (classification) or predict (regression)
-        exapliner_name: 'shap' or 'sage' or 'shapiq' or 'expected_gradients'
-        strategy: 'kernel' or 'permutation' or 'expected_gradients'
-        seed: random seed
-
+    Unified interface for SHAP, SAGE and SHAP-IQ explanation methods.
     """
-
     def __init__(self, model, explainer_name: str, task_type: str, strategy: str = "na", seed: int = 0):
         self.model = model
         self.explainer_name = explainer_name.lower()

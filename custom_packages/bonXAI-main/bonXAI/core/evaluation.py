@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Dict
-from bonXAI.core.metrics import compute_mae, compute_mmd, top_k_score
+from bonXAI.core.metrics import compute_mae, compute_mmd, top_k_score, topk_pair_overlap
 
 class Evaluator:
     """
@@ -44,6 +44,7 @@ class Evaluator:
 
         Raises:
             ValueError: On invalid shapes, types, or non-finite values.
+            ValueError: If ndim of explanation is not 1, 2, 3.
         """
         explanation = np.asarray(explanation)
 
@@ -62,8 +63,13 @@ class Evaluator:
         self._ensure_finite(self.ground_truth_explanation, "ground truth explanation")
 
         mae = compute_mae(explanation, self.ground_truth_explanation)
-        k = max(1, min(5, explanation.shape[-1])) 
-        top_k = top_k_score(explanation, self.ground_truth_explanation, k=k)
+        k = max(1, min(5, explanation.shape[-1]))
+        if explanation.ndim == 1 or explanation.ndim == 2: # SHAP or SAGE od Expected Gradients case
+            top_k = top_k_score(explanation, self.ground_truth_explanation, k=k)
+        elif explanation.ndim == 3: # SHAP-IQ case
+            top_k = topk_pair_overlap(explanation, self.ground_truth_explanation, k=k)
+        else:
+            raise ValueError("explanation must be 1D or 2D")
 
         return {
             "mae": float(mae),

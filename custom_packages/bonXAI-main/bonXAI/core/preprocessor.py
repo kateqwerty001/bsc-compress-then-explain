@@ -4,8 +4,6 @@ import time
 from bonXAI.core.bonxai_compress import bonxai_compress
 from bonXAI.core.kernel import resolve_kernel_params
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from pydvl.influence.torch import CgInfluence
 from arfpy import arf as arf_mod
@@ -16,9 +14,13 @@ from sklearn.mixture import GaussianMixture
 
 class Compressor:
     """
-    description
+    Compresses a dataset (X, y) using various methods:
+    - Kernel Thinning
+    - Stein Thinning
+    - Compression based on Influence Functions
+    - Compression based on ARFPy (ARF - Adversarial Random Forests)
+    - IID sampling
     """
-
     def __init__(
             self,
             X: np.ndarray,
@@ -26,24 +28,78 @@ class Compressor:
             model,
             seed: int = 0
     ):
+        """
+        Initializes compressor with data and model.
+
+        Args:
+            X (np.ndarray): Array of samples.
+            y (np.ndarray): Array of target values.
+            model: Trained model.
+            seed (int): Random seed for reproducibility.
+        """
         self.X = X
         self.y = y
         self.model = model
         self.seed = seed
 
     def _kernel_thinning(
-            self, g: int, num_bins: int, target_size: int, delta: float, kernel_type: bytes, k_params: np.ndarray
+            self,
+            g: int,
+            num_bins: int,
+            target_size: int,
+            delta: float,
+            kernel_type: bytes,
+            k_params: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+        """
+        Compress data using kernel thinning.
+
+        Args:
+            g (int): Oversampling parameter for `compress_kt()`.
+            num_bins (int): Number of bins for `compress_kt()`.
+            target_size (int): Desired compressed coreset size.
+            delta (float): Failure probability parameter for thinning.
+            kernel_type (bytes): Kernel type (b"gaussian", b"sobolev", etc.).
+            k_params (np.ndarray): Kernel parameters.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+            - Array of samples selected from X.
+            - Array of target values corresponding to the selected samples.
+            - Row indices (indices) in the original X used in the sample.
+            - Compression time.
+        """
         start = time.time()
-        indices = bonxai_compress(self.X, kernel_type, k_params, g=g, num_bins=num_bins, target_size=target_size,
-                                  delta=delta, seed=self.seed)
+        indices = bonxai_compress(
+            self.X, kernel_type, k_params, g=g, num_bins=num_bins, target_size=target_size, delta=delta, seed=self.seed
+        )
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
 
     def _stein_thinning(
-            self, m: int, grad_type: bytes = b'gaussian', n_components: int = 2
-            # good to use 2 for binary classification
+            self,
+            m: int,
+            grad_type: bytes = b'gaussian',
+            n_components: int = 2
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+        """
+        Compress data using Stein thinning.
+
+        Args:
+            m (int): Number of points to select (target coreset size).
+            grad_type (bytes): Type of gradient to use:
+                - b'gaussian': Gaussian-based gradient
+                - b'kde': Kernel density estimate gradient - experimental
+                - b'gmm': Gaussian Mixture Model gradient - experimental
+            n_components (int): Number of components for GMM (used if grad_type=b'gmm').
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+            - Array of samples selected from X.
+            - Array of target values corresponding to the selected samples.
+            - Row indices (indices) in the original X used in the sample.
+            - Compression time.
+        """
         grad = None
         start = time.time()
 
@@ -84,14 +140,30 @@ class Compressor:
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
 
-    def _influence_compression(self, target_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float, object]:
+    def _influence_compression(
+            self,
+            target_size: int
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float, object]:
         """
         Influence-based compression using PyDVL's CgInfluence.
         Computes self-influence scores for all samples in (X, y) and selects
         the top target_size most influential points as the compressed set.
+
+        Args:
+            target_size (int): Number of points to select for the compressed set.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+            - Array of samples selected from X.
+            - Array of target values corresponding to the selected samples.
+            - Row indices (indices) in the original X used in the sample.
+            - Compression time.
+            - Influence matrix (object) computed by CgInfluence
         """
         assert isinstance(self.model, torch.nn.Module), "Expected PyTorch model"
         n = target_size
+
+        # --- Basic compression to sqrt(n'): n' - the largest power of 4 <= number os samples ---
         if n is None:
             x = int(np.floor(np.log2(np.sqrt(self.X.shape[0]))))
             n = 2 ** x
@@ -117,26 +189,42 @@ class Compressor:
             solve_simultaneously=True
         ).fit(train_loader)
 
-        # Self-influence: influence of each point on all others
+        # --- Self-influence: influence of each point on all others ---
         influence_matrix = influence_model.influences(X_tensor, y_tensor, X_tensor, y_tensor, mode="up")
-        influence_avg = influence_matrix.mean(axis=0).cpu().numpy()  # one score per training point
+        influence_avg = influence_matrix.abs().mean(axis=0).cpu().numpy()  # one score per training point
 
-        # Select top-K by average influence magnitude
+        # --- Select top-K by average influence magnitude ---
         top_k_indices = influence_avg.argsort()[-n:]
         end = time.time()
         return self.X[top_k_indices], self.y[top_k_indices], top_k_indices, end - start, influence_matrix
 
-    def _arfpy_compression(self, target_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    def _arfpy_compression(
+            self,
+            target_size: int
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
         """
         Generative compression using ARFPy (Adversarial Random Forests).
-        Trains an ARF density model on (X, y) and synthesizes target_size new samples approximating the original data distribution.
-        """
-        start = time.time()
+        Trains an ARF density model on (X, y) and synthesizes `target_size`
+        new samples approximating the original data distribution.
 
+        Args:
+            target_size (int): Number of points to select for the compressed set.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+            - Array of samples selected from X.
+            - Array of target values corresponding to the selected samples.
+            - Row indices (indices) in the original X used in the sample.
+            - Compression time.
+        """
         n = target_size
+
+        # --- Basic compression to sqrt(n'): n' - the largest power of 4 <= number os samples ---
         if n is None:
             x = int(np.floor(np.log2(np.sqrt(self.X.shape[0]))))
             n = 2 ** x
+
+        start = time.time()
         df = pd.DataFrame(self.X, columns=[f"feat_{i}" for i in range(self.X.shape[1])])
         df["label"] = pd.Categorical(self.y)
 
@@ -153,11 +241,27 @@ class Compressor:
         return X_gen, y_gen, indices, end - start
 
     def _iid_sampling(
-            self, target_size: int
+            self,
+            target_size: int
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+        """
+        Compress data via IID random sampling without replacement.
+
+        Args:
+            target_size (int): Number of points to select for the compressed set.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+            - Array of samples selected from X.
+            - Array of target values corresponding to the selected samples.
+            - Row indices (indices) in the original X used in the sample.
+            - Compression time.
+        """
         n = target_size
+
         if n is None:
             n = self.X.shape[0]
+
         start = time.time()
         rng = np.random.default_rng(self.seed)
         indices = rng.choice(self.X.shape[0], size=n, replace=False)
@@ -167,9 +271,8 @@ class Compressor:
 
 class Preprocessor:
     """
-    description
+        Preprocesses data using the selected modification and compression method.
     """
-
     def __init__(
             self,
             X: np.ndarray,
@@ -179,6 +282,19 @@ class Preprocessor:
             data_modification_method: str = "none",
             seed: int = 0,
     ):
+        """
+        Initializes the Preprocessor.
+
+        Args:
+            X (np.ndarray): Array of samples to preprocess.
+            y (np.ndarray): Array of target values.
+            model (object): Trained model.
+            compression_method (str): Name of the compression method to apply
+                Options: {"kernel_thinning", "stein_thinning", "influence", "arfpy", "iid"}
+            data_modification_method (str): Modifying data method to apply before compression.
+                Options: {"none", "predictions", "stratified"}.
+            seed (int): Random seed.
+        """
         self.X = X
         self.y = y
         self.model = model
@@ -186,11 +302,14 @@ class Preprocessor:
         self.compression_method = compression_method
         self.seed = seed
 
-    def _data_with_predictions(
-            self
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def _data_with_predictions(self) -> Tuple[np.ndarray, np.ndarray]:
         """
-        description
+        Augments the feature matrix with model prediction probabilities.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]:
+            - Augmented feature matrix with predicted probabilities appended.
+            - Array of predicted probabilities.
         """
         preds = self.model.predict_proba(self.X)
         X_aug = np.concatenate([self.X, preds], axis=1)
@@ -209,7 +328,28 @@ class Preprocessor:
     ) -> Union[Tuple[np.ndarray, np.ndarray, np.ndarray, float],
     Tuple[np.ndarray, np.ndarray, np.ndarray, float, object]]:
         """
-        Call the selected compression on (X_mod, y_mod).
+        Dispatches the selected compression method and executes it on the modified dataset.
+
+        Args:
+            X_mod (np.ndarray): Array of samples after applying `data_modification_method`.
+            y_mod (np.ndarray): Array of target values.
+            g (int): Oversampling parameter in `bonxai_compress()`.
+            num_bins (int): Number of bins in `bonxai_compress()`.
+            target_size (int): Desired number of samples after compression.
+            kernel (str): Kernel type used in kernel thinning.
+                Options: {"gaussian", "sobolev", "ineverse_multiquadric", "matern"}
+            delta (float): Delta parameter for kernel thinning.
+            grad_type (bytes): Gradient type identifier for Stein thinning.
+                Options: {"gaussian", "kde", "gmm"}. "kde" and "gmm" are experimental.
+
+        Returns:
+            Union[Tuple[np.ndarray, np.ndarray, np.ndarray, float],
+                  Tuple[np.ndarray, np.ndarray, np.ndarray, float, object]]:
+            - Array of samples selected from X.
+            - Array of target values corresponding to the selected samples.
+            - Row indices (indices) in the original X used in the sample.
+            - Compression time.
+            - (Optional) Method-specific object (e.g., influence matrix)
         """
         compressor = Compressor(X_mod, y_mod, self.model, seed=self.seed)
 
@@ -232,7 +372,7 @@ class Preprocessor:
         else:
             raise ValueError(f"Unknown compression method: {self.compression_method}")
 
-    def _preprocess(
+    def preprocess(
             self,
             g: Optional[int] = 0,
             num_bins: Optional[int] = 4,
@@ -243,7 +383,32 @@ class Preprocessor:
     ) -> Union[
         Tuple[np.ndarray, np.ndarray, np.ndarray, float], Tuple[np.ndarray, np.ndarray, np.ndarray, float, object]]:
         """
-        description
+        Runs the full preprocessing pipeline, including optional dataset
+        modification and the selected compression method.
+
+        Args:
+            g (int): Oversampling parameter in `bonxai_compress()`.
+            num_bins (int): Number of bins in `bonxai_compress()`.
+            target_size (int): Desired number of samples after compression.
+            kernel (str): Kernel type used in kernel thinning.
+                Options: {"gaussian", "sobolev", "ineverse_multiquadric", "matern"}
+            delta (float): Delta parameter for kernel thinning.
+            grad_type (bytes): Gradient type identifier for Stein thinning.
+                Options: {"gaussian", "kde", "gmm"}. "kde" and "gmm" are experimental.
+
+        Returns:
+            Union[Tuple[np.ndarray, np.ndarray, np.ndarray, float],
+                  Tuple[np.ndarray, np.ndarray, np.ndarray, float, object]]:
+            - Array of samples selected from X.
+            - Array of target values corresponding to the selected samples.
+            - Row indices (indices) in the original X used in the sample.
+            - Compression time.
+            - (Optional) Method-specific object (e.g., influence matrix)
+
+        Raises:
+            ValueError: If an unknown data modification method is provided.
+            ValueError: If the model does not implement `predict()` or `predict_proba()` in stratified mode.
+            ValueError: If an unknown compression method is specified.
         """
         if self.data_modification_method in {"none", "stratified"}:
             X_mod, y_mod = self.X, self.y
@@ -262,7 +427,7 @@ class Preprocessor:
             elif hasattr(self.model, "predict"):
                 y_pred_cls = self.model.predict(self.X)
             else:
-                raise ValueError("model must implement predict or predict_proba for 'stratified' mode.")
+                raise ValueError("model must implement `predict()` or `predict_proba()` for 'stratified' mode.")
 
             X_parts: List[np.ndarray] = []
             y_parts: List[np.ndarray] = []
