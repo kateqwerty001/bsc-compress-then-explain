@@ -1,33 +1,27 @@
 import os
 import random
-import numpy as np
 import math
-import openml
-from openxai.model import LoadModel, ReturnLoaders
-from sklearn.model_selection import train_test_split
 import torch
 import numpy as np
 from scipy.spatial.distance import pdist
 
-# CTR23 benchmark suite - regression tasks
-CTR23_ALL = [44956, 44957, 44958, 44990, 44977, 44994, 44959, 44984, 44978, 44979, 44960, 45012, 
-         44962, 44992, 44965, 44973, 44993, 44980, 44989, 44983, 41021, 44969, 44963, 44981, 
-         44970, 44972, 44976, 44987, 44966, 45402, 44967, 44964, 44974, 44975, 44971]
-CTR23_ALL = sorted(CTR23_ALL)
-
-# used for experiments 
+# CTR23 benchmark suite - regression tasks - used for experiments
 CTR23_LARGE = [44964, 44975, 44981, 44992]
 CTR23_SMALL = [44956, 44963, 44969, 44971, 44973, 44974, 44976, 44977, 44978, 44979, 44980, 44983, 44984, 44989, 44990, 44993, 45012]
+CTR23_ALL = sorted(CTR23_SMALL + CTR23_LARGE)
 
-# CC18 benchmark suite - classification tasks
-# used for experiments 
+# CC18 benchmark suite - classification tasks - used for experiments
 CC18_LARGE = [28, 44, 182, 300, 554, 1486, 1475, 4538, 1478, 40499, 40668, 40996, 40923, 40927]
 CC18_SMALL = [6, 32, 151, 1053, 1590, 1489, 1497, 4534, 1461, 40983, 41027, 23517, 40701]
-CC18_ALL = CC18_LARGE + CC18_SMALL
+CC18_ALL = sorted(CC18_LARGE + CC18_SMALL)
+
 
 def set_global_seed(seed: int) -> None:
     """
-    Sets seed for all known sources of randomness.
+    Set the random seed for Python, NumPy, and PyTorch to ensure reproducible results.
+
+    Args:
+        seed (int): Seed value.
     """
     random.seed(seed)
     np.random.seed(seed)
@@ -48,7 +42,14 @@ def set_global_seed(seed: int) -> None:
 
 def possible_g_values(n_samples: int, num_bins: int) -> list[int]:
     """
-    Returns a list of possible values of g for compress_kt() function based on the number of samples and bins.
+    Find all valid values of g for the compress_kt() function to be used.
+
+    Args:
+        n_samples (int): Total number of samples.
+        num_bins (int): Number of bins used.
+
+    Returns:
+        list[int]: Valid g values.
     """
     x = n_samples // num_bins
     power = 1
@@ -66,7 +67,13 @@ def possible_g_values(n_samples: int, num_bins: int) -> list[int]:
 
 def possible_num_bins_values(n_samples: int) -> list[int]:
     """
-    Returns a list of possible values of num_bins for compress_kt() function based on the number of samples.
+    Find valid values of num_bins for the compress_kt() function to be used.
+
+    Args:
+        n_samples (int): Total number of samples.
+
+    Returns:
+        list[int]: All powers of 4 (4^k) that do not exceed n_samples.
     """
     possible_num_bins = []
     power = 1 # assume that num_bins starts at 4
@@ -78,7 +85,16 @@ def possible_num_bins_values(n_samples: int) -> list[int]:
 
 def compresspp_kt_output_size(X: np.ndarray) -> int:
     """
-    Returns compressed explanation size for compresspp_kt().
+    Find the size of the coreset returned by the compresspp_kt() function.
+
+    Args:
+        X (np.ndarray): Input array of all samples
+
+    Returns:
+        int: coreset size after compression in compresspp_kt() function.
+
+    Raises:
+        ValueError: If `X` is empty.
     """
     n = len(X)
     if n <= 0:
@@ -87,13 +103,40 @@ def compresspp_kt_output_size(X: np.ndarray) -> int:
     return int(np.sqrt(n_prime))
 
 
-def median_pairwise_distance_sample(X, n_pairs=100_000, random_state=None):
+def median_pairwise_distance_sample(
+    X: np.ndarray,
+    n_pairs: int = 100_000,
+    random_state: int | None = None
+) -> float:
+    """
+    Compute or estimate the median pairwise distance between all samples in X.
+
+    Args:
+        X (np.ndarray): Input array of all samples.
+        n_pairs (int): Number of pairs to sample from all samples.
+        random_state (int | None): Seed for reproducibility.
+
+    Returns:
+        float: Median pairwise distance.
+
+    Raises:
+        ValueError: If `X` is None or empty, or if `n_pairs` <= 0.
+    """
+    if X is None or len(X) == 0:
+        raise ValueError("X cannot be None or empty")
+    if n_pairs <= 0:
+        raise ValueError("n_pairs must be positive")
+
     rng = np.random.default_rng(random_state)
     n = X.shape[0]
-    if n*(n-1)//2 <= n_pairs:
-        return np.median(pdist(X))
+
+    # Compute exact median if the number of pairs is relatively small
+    if n * (n - 1) // 2 <= n_pairs:
+        return float(np.median(pdist(X)))
+
+    # Sample random pairs to estimate median
     i = rng.integers(0, n, n_pairs)
     j = rng.integers(0, n, n_pairs)
     mask = i != j
     d = np.linalg.norm(X[i[mask]] - X[j[mask]], axis=1)
-    return np.median(d)
+    return float(np.median(d))

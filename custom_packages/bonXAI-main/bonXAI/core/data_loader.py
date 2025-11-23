@@ -1,10 +1,11 @@
 import numpy as np
 import openml
-import pandas as pd
 import torch
+from typing import Union, Tuple, Optional
 from bonXAI.core.pytorch_ann import PyTorchANN
 from bonXAI.core.tabular_preprocessor import TabularPreprocessor
 from bonXAI.core.utils import CC18_ALL, CTR23_ALL
+from numpy import ndarray
 from openxai.model import LoadModel, ReturnLoaders
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier, XGBRegressor
@@ -22,35 +23,51 @@ class DataLoader:
         self, dataset_name: str, model_name: str
     ) -> tuple[np.ndarray, np.ndarray, torch.nn.Module]:
         """
-        Loads test data and a pretrained model from the OpenXAI library.
+        Load test data and a pretrained model from OpenXAI.
 
         Args:
-            dataset_name: The name of the dataset to load (e.g., "german").
-            model_name: The name of the model. Only "ann" is supported.
+            dataset_name (str): Dataset name, e.g., "german".
+            model_name (str): Model name. Only 'ann' is supported.
 
         Returns:
-            A tuple containing:
-            - X_test: Test features as a NumPy array.
-            - y_test: Test targets as a NumPy array.
-            - model: The pretrained PyTorch model, set to evaluation mode.
+            Tuple[np.ndarray, np.ndarray, torch.nn.Module]:
+                - X_test: Test samples.
+                - y_test: Test target values.
+                - model: Pretrained  ANN from OpenXAI.
+
+        Raises:
+            ValueError: If model_name is not 'ann'.
         """
         if model_name != "ann":
             raise ValueError(f"Model '{model_name}' is not supported. Only 'ann' is available.")
 
+        # --- Load data ---
         _, loader_test = ReturnLoaders(data_name=dataset_name, download=True, batch_size=128)
         X_test = loader_test.dataset.data.to_numpy()
         y_test = loader_test.dataset.targets.to_numpy()
 
+        # --- Load model ---
         model = LoadModel(data_name=dataset_name, ml_model=model_name, pretrained=True)
         model.eval()
 
         return X_test, y_test, model
 
     def _get_model(
-        self, model_name: str, task_type: str, random_state: int
-    ) -> PyTorchANN | XGBClassifier | XGBRegressor:
+            self, model_name: str, task_type: str, random_state: int
+    ) -> Union[PyTorchANN, XGBClassifier, XGBRegressor]:
         """
-        Initializes a model based on its name and the machine learning task type.
+        Initialize a model based on its name and task type - used for datasets from OpenML.
+
+        Args:
+            model_name (str): 'ann' or 'xgboost'.
+            task_type (str): 'classification' or 'regression'.
+            random_state (int): Random seed for reproducibility.
+
+        Returns:
+            Initialized model object.
+
+        Raises:
+            ValueError: If model_name is not supported.
         """
         model_map = {
             "ann": PyTorchANN(task_type=task_type, random_state=0),
@@ -69,26 +86,39 @@ class DataLoader:
         return model
 
     def load_from_openml(
-        self, dataset_id: int, model_name: str, task_type: str = None
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, object, TabularPreprocessor]:
+        self, dataset_id: int, model_name: str, task_type: Optional[str] = None
+    ) -> Tuple[
+        str,
+        ndarray,
+        ndarray,
+        ndarray,
+        Optional[ndarray],
+        Union[PyTorchANN, XGBClassifier, XGBRegressor],
+        TabularPreprocessor
+    ]:
         """
         Loads data from OpenML, preprocesses it, trains a model, and returns all components.
 
         Args:
-            dataset_id: The ID of the dataset on OpenML.
-            model_name: The name of the model to train ('ann' or 'xgboost').
-            task_type: The task type ('classification' or 'regression').
-                       If None, the class will attempt to infer it based on the dataset ID.
+            dataset_id (int): OpenML dataset ID.
+            model_name (str): 'ann' or 'xgboost'.
+            task_type (Optional[str]): 'classification' or 'regression'.
+                If None, inferred from dataset ID.
 
         Returns:
-            A tuple containing:
-            - X_train: Preprocessed training features.
-            - y_train: Preprocessed training target.
-            - X_test: Preprocessed test features.
-            - y_test: Preprocessed test target.
-            - model: The trained model object.
-            - preprocessor: The fitted TabularPreprocessor instance.
+            Tuple containing:
+                - dataset_name (str)
+                - X_train (ndarray): Preprocessed training features.
+                - y_train (ndarray): Training target.
+                - X_test (ndarray): Preprocessed test features.
+                - y_test (ndarray or None): Test target.
+                - model: Trained model object.
+                - preprocessor: Fitted TabularPreprocessor instance.
+
+        Raises:
+            ValueError: If task_type cannot be inferred.
         """
+        # --- Infer task type if not provided ---
         if task_type is None:
             if dataset_id in CC18_ALL:
                 task_type = "classification"
@@ -102,6 +132,8 @@ class DataLoader:
 
         dataset = openml.datasets.get_dataset(dataset_id)
         X, y, _, _ = dataset.get_data(target=dataset.default_target_attribute)
+
+        # The `random_state` is fixed to ensure the same split across experiments.
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.25, random_state=dataset_id
         )
@@ -111,11 +143,13 @@ class DataLoader:
             id_like_threshold=0.99,
             scale_all_numeric_after_encoding=True,
             scale_target_in_regression=True,
-            random_state=0,
+            random_state=0, # ensures reproducible preprocessing over experiments we perform.
         )
+        # --- Preprocess data ---
         X_train_processed, y_train_processed = preprocessor.fit_transform(X_train, y_train)
         X_test_processed, y_test_processed = preprocessor.transform(X_test, y_test)
 
+        # --- Train the model ---
         model = self._get_model(model_name, task_type, random_state=dataset_id)
         model.fit(X_train_processed.values, y_train_processed)
 
