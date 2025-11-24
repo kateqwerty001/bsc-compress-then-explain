@@ -22,9 +22,28 @@ except Exception:
 
 class Explainer:
     """
-    Unified interface for SHAP, SAGE and SHAP-IQ explanation methods.
+    A class for calculating explanations: SHAP, SAGE, SHAP-IQ, Expected Gradients
+    on X_foreground samples using the X_background samples.
     """
     def __init__(self, model, explainer_name: str, task_type: str, strategy: str = "na", seed: int = 0):
+        """
+        Initialize the Explainer object with a model and explanation settings.
+
+        Args:
+            model: A trained model object. For classification, it must implement `predict_proba`.
+                For regression, it must implement `predict`.
+            explainer_name (str): Name of the explainer to use.
+                Options: {"shap", "sage", "shapiq", "expected_gradients"}
+            task_type (str): Type of task.
+                Options: {"classification", "regression"}
+            strategy: Strategy for the explainer, if applicable.
+                Options depend on the explainer (e.g., "kernel", "permutation", "na")
+            seed (int): Random seed for reproducibility.
+
+        Raises:
+            - If `explainer_name` or `strategy` is not supported.
+            - If the model does not have required methods for the specified `task_type`.
+        """
         self.model = model
         self.explainer_name = explainer_name.lower()
         self.strategy = strategy.lower()
@@ -55,16 +74,30 @@ class Explainer:
         verbose: bool = True
     ) -> Tuple[np.ndarray, float]:
         """
-        Generate explanations.
+        Calculate explanations for the selected explaining method
+        on X_foreground samples, using the X_background samples.
 
-        Parameters:
-            X_foreground: data points to explain
-            X_background: background data for reference
-            n_jobs: number of parallel jobs (for SAGE - sage library implementation, for SHAP - custom implementation)
-            y: ground truth labels (required for SAGE)
+        Args:
+            X_foreground (np.ndarray): Array of samples on which to calculate explanations.
+            X_background (np.ndarray): Array of samples which are considered as representatives
+                of the whole the distribution by explainer.
+            n_jobs (int): Number of parallel jobs to use. If not specified (-1, or None),
+                uses all available CPU cores.
+            y_foreground (np.ndarray): Ground truth labels for the foreground samples.
+            y_background (np.ndarray): Ground truth labels for the background samples.
+            verbose (bool, optional): If True, prints progress messages. Default is True.
 
         Returns:
-            (explanation_values, time_elapsed)
+            Tuple[np.ndarray, float]:
+                - `explanation_values`: Array of explanation values.
+                - `time_elapsed`: Total time taken to compute the explanations.
+
+        Raises:
+            ValueError:
+                - If `n_jobs` is invalid.
+                - If required labels (`y_foreground` or `y_background`) are missing for SAGE or Influence explainers.
+            RuntimeError:
+                - If the explainer configuration is invalid or not supported.
         """
         if n_jobs is None or n_jobs == -1:
             n_jobs = joblib.cpu_count()
@@ -75,19 +108,52 @@ class Explainer:
             raise ValueError("n_jobs must be None, -1, or a positive integer.")
 
         if self.explainer_name == "shap":
-            return self._explain_shap(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs, verbose=verbose)
+            return self._explain_shap(
+                X_background=X_background,
+                X_foreground=X_foreground,
+                n_jobs=n_jobs,
+                verbose=verbose
+        )
+
         elif self.explainer_name == "sage":
             if y_foreground is None:
                 raise ValueError("SAGE explanation requires labels (y).")
-            return self._explain_sage(X_background=X_background, X_foreground=X_foreground, y_foreground=y_foreground, n_jobs=n_jobs, verbose=verbose)
+            return self._explain_sage(
+                X_background=X_background,
+                X_foreground=X_foreground,
+                y_foreground=y_foreground,
+                n_jobs=n_jobs,
+                verbose=verbose
+            )
+
         elif self.explainer_name == "expected_gradients":
-            return self._explain_expected_gradients(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs, verbose=verbose)
+            return self._explain_expected_gradients(
+                X_background=X_background,
+                X_foreground=X_foreground,
+                n_jobs=n_jobs,
+                verbose=verbose
+            )
+
         elif self.explainer_name == "shapiq":
-            return self._explain_shapiq(X_background=X_background, X_foreground=X_foreground, n_jobs=n_jobs, verbose=verbose)
+            return self._explain_shapiq(
+                X_background=X_background,
+                X_foreground=X_foreground,
+                n_jobs=n_jobs,
+                verbose=verbose
+            )
+
         elif self.explainer_name == "influence":
             if y_foreground is None or y_background is None:
                 raise ValueError("Influence explanation requires both foreground and background labels (y).")
-            return self._explain_influence(X_background=X_background, y_background=y_background, X_foreground=X_foreground, y_foreground=y_foreground, n_jobs=n_jobs, verbose=verbose)
+            return self._explain_influence(
+                X_background=X_background,
+                y_background=y_background,
+                X_foreground=X_foreground,
+                y_foreground=y_foreground,
+                n_jobs=n_jobs,
+                verbose=verbose
+            )
+
         raise RuntimeError("Invalid configuration.")
 
     def _explain_shap(
@@ -97,46 +163,85 @@ class Explainer:
             n_jobs: int, 
             verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
-        print(f"Explaining with SHAP. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
+        """
+        Calculates SHAP explanations.
 
+        Args:
+            X_background (np.ndarray): Array of samples which are considered as representatives
+                of the whole the distribution.
+            X_foreground (np.ndarray): Array of samples on which to calculate explanations.
+            n_jobs: Number of parallel jobs to use. Must be >= 1.
+                Parallelization is applied over batches of foreground samples.
+            verbose (bool): Indicator, whether to print progress messages. Default is True.
+
+        Returns:
+            Tuple[np.ndarray, float]:
+                - Computed SHAP values. Always of shape (n_samples, d)
+                    Note: In case of classification: explanations are taken only
+                    for the predicted class.
+                - Total runtime in seconds, including initialization time and
+                    per-batch explanation time.
+
+        Raises:
+            ValueError: If the SHAP strategy specified in the configuration is unknown.
+        """
+        print(
+            f"Explaining with SHAP. {len(X_foreground)} samples to explain "
+            f"using {len(X_background)} background samples."
+        )
+
+        # ------------------------- Initialization -------------------------
         start = time.time()
         if self.strategy == "kernel":
             explainer = shap.KernelExplainer(self.prediction_function, X_background, seed=self.seed)
+
         elif self.strategy == "permutation":
             masker = shap.maskers.Independent(X_background, max_samples=X_background.shape[0])
             explainer = shap.PermutationExplainer(self.prediction_function, masker, seed=self.seed)
+
         else:
             raise ValueError(f"Unknown strategy for SHAP: {self.strategy}")
+
         initialization_time = time.time() - start
 
-        total_explanation_time = 0.0
-
-        # custom batching for parallel processing
+        # ------------------------- Batching -------------------------
         BATCH_SIZE = 10
-        batches = [X_foreground[(i*BATCH_SIZE):(i+1)*BATCH_SIZE] for i in range(int(1+X_foreground.shape[0]/BATCH_SIZE))]
+        batches = [
+            X_foreground[(i*BATCH_SIZE):(i+1)*BATCH_SIZE] for i in range(int(1+X_foreground.shape[0]/BATCH_SIZE))
+        ]
 
         if verbose:
-            print(f"Running SHAP explanation in parallel using {n_jobs} jobs, {len(batches)} batches of size {BATCH_SIZE}")
+            print(f"Running SHAP explanation in parallel using {n_jobs} jobs,"
+                  f" {len(batches)} batches of size {BATCH_SIZE}")
 
-        def run_batch(batch, batch_idx):
+        # ------------------------- Per-batch execution -------------------------
+        def run_batch(batch: np.ndarray, batch_idx: int):
             set_global_seed(int(self.seed + batch_idx))
             nonlocal total_explanation_time
-            start = time.time()
-            shap_values = explainer(batch, silent=True).values
-            batch_time = time.time() - start
+            t0 = time.time()
+            shap_values_ = explainer(batch, silent=True).values
+            batch_time = time.time() - t0
+
             if verbose:
                 print(f"  → Finished batch {batch_idx + 1}/{len(batches)}")
-            return shap_values, batch_time
-        
+
+            return shap_values_, batch_time
+
+        # ------------------------- Parallel processing -------------------------
         results = joblib.Parallel(n_jobs=n_jobs)(
-            joblib.delayed(run_batch)(batch, idx) for idx, batch in enumerate(batches) if batch.shape[0] > 0
+            joblib.delayed(run_batch)(batch, idx)
+            for idx, batch in enumerate(batches)
+            if batch.shape[0] > 0
         )
 
+        # ------------------------- Combine results -------------------------
         shap_values = np.concatenate([sv for sv, _ in results], axis=0)
         total_explanation_time = sum(batch_time for _, batch_time in results) + initialization_time
+
         if verbose:
             print(f"  → Finished all {X_foreground.shape[0]} samples")
 
+        # ------------------------- Classification handling -------------------------
         if self.task_type == "classification":
             predictions = self.prediction_function(X_foreground)
             predicted_classes = np.argmax(predictions, axis=1)
@@ -144,7 +249,6 @@ class Explainer:
             shap_values = shap_values[np.arange(num_samples), :, predicted_classes]
 
         return shap_values, total_explanation_time
-
 
     def _explain_sage(
             self,
@@ -154,11 +258,31 @@ class Explainer:
             n_jobs: int, 
             verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
+        """
+        Calculates SAGE explanations.
+
+        Args:
+            X_background (np.ndarray): Array of samples which are considered as representatives
+                of the whole the distribution.
+            X_foreground (np.ndarray): Array of samples on which to calculate explanations.
+            y_foreground (np.ndarray): Array of target values for `X_foreground` samples.
+            n_jobs: Number of parallel jobs to use. Must be >= 1.
+            verbose (bool): Indicator, whether to print progress messages. Default is True.
+
+        Returns:
+            Tuple[np.ndarray, float]:
+                - Computed SAGE explanations.
+                - Total runtime in seconds.
+
+        Raises:
+            ValueError: If the SHAP strategy specified in the configuration is unknown.
+        """
         print(f"Explaining with SAGE. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
-        
+
         start = time.time()
         imputer = sage.MarginalImputer(self.prediction_function, X_background)
 
+        # edge case
         if self.loss == "cross entropy":
             y_foreground = (y_foreground == 1).astype(int)
             if len(np.unique(y_foreground)) == 1:
@@ -186,8 +310,25 @@ class Explainer:
             n_jobs: int, 
             verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
+        """
+        Calculates SHAP-IQ explanations of order 2 (coalitions of size 2).
+
+        Args:
+            X_background (np.ndarray): Array of samples which are considered as representatives
+                of the whole the distribution.
+            X_foreground (np.ndarray): Array of samples on which to calculate explanations.
+            n_jobs: Number of parallel jobs to use. Must be >= 1.
+            verbose (bool): Indicator, whether to print progress messages. Default is True.
+
+        Returns:
+            Tuple[np.ndarray, float]:
+                - Computed SHAP-IQ explanations for each sample in foreground samples.
+                    Shape is (n_samples, d, d)
+                - Total runtime in seconds spent on explanations.
+        """
         print(f"Explaining with ShapIQ. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
 
+        # ------------------------- Initialization -------------------------
         if self.task_type == "regression":
             model_func = self.prediction_function
         elif self.task_type == "classification":
@@ -213,6 +354,7 @@ class Explainer:
             imputer=imputer
         )
 
+        # ------------------------- Per-sample execution -------------------------
         def explain_single(i):
             set_global_seed(int(self.seed + i))
             start = time.time()
@@ -223,19 +365,24 @@ class Explainer:
             except Exception:
                 pair = None
             elapsed = time.time() - start
+
             if verbose:
                 print(f"  → Finished sample {i + 1}/{X_foreground.shape[0]}")
+
             return main, pair, elapsed
 
+        # ------------------------- Parallel processing -------------------------
         results = joblib.Parallel(n_jobs=n_jobs)(
-            joblib.delayed(explain_single)(int(i)) for i in range(X_foreground.shape[0])
+            joblib.delayed(explain_single)(int(i))
+            for i in range(X_foreground.shape[0])
         )
 
+        # ------------------------- Combine results -------------------------
         main_effects, pairwise_list, times = zip(*results)
         self.main_effects = np.vstack(main_effects)
-        total_elapsed = sum(times)
+        explanation_time = sum(times)
 
-        return pairwise_list, total_elapsed
+        return pairwise_list, explanation_time
     
     def _explain_expected_gradients(
             self,
@@ -243,7 +390,29 @@ class Explainer:
             X_foreground: np.ndarray,
             n_jobs: int = None, 
             verbose: bool = True
-        ):
+        ) -> Tuple[np.ndarray, float]:
+        """
+        Calculates Expected Gradients explanations.
+
+        Args:
+            X_background (np.ndarray): Array of samples which are considered as representatives
+                of the whole the distribution.
+            X_foreground (np.ndarray): Array of samples on which to calculate explanations.
+            n_jobs: Number of parallel jobs to use. Must be >= 1.
+            verbose (bool): Indicator, whether to print progress messages. Default is True.
+
+        Returns:
+            Tuple[np.ndarray, float]:
+                - Computed Expected Gradients. Always of shape (n_samples, d)
+                    Note: In case of classification: explanations are taken only
+                    for the predicted class.
+                - Total runtime in seconds, including initialization time and
+                    per-batch explanation time.
+
+        Raises:
+            TypeError: If model is not a PyTorchANN instance.
+            ValueError: If task_type is not 'classification' or 'regression'.
+        """
         print(f"Explaining with Expected Gradients. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
         start = time.time()
 
@@ -256,11 +425,13 @@ class Explainer:
 
         explanations = []
 
+        # ------------------------- Per-sample execution -------------------------
         def explain_sample(i, target_class=None):
             set_global_seed(int(self.seed + i))
             x_sample = inputs[i:i+1]
 
             tasks = []
+            # --- run over all baselines ---
             for j in range(baselines.shape[0]):
                 seed_j = self.seed + i * baselines.shape[0] + j
                 set_global_seed(int(seed_j))
@@ -269,10 +440,12 @@ class Explainer:
                 else:
                     tasks.append(joblib.delayed(explainer.attribute)(x_sample, baselines[[j]]))
 
+            # ------------------------- Parallel processing -------------------------
             results = joblib.Parallel(n_jobs=n_jobs)(tasks)
             explanation = torch.mean(torch.stack(results), dim=0)
             return explanation.detach().cpu().numpy().ravel()
 
+        # ------------------------- Handle classification -------------------------
         if self.task_type == "classification":
             predictions = self.prediction_function(X_foreground)
             predicted_classes = np.argmax(predictions, axis=1)
@@ -280,15 +453,18 @@ class Explainer:
             if verbose:
                 print(f"Running Expected Gradients for {len(inputs)} samples (classification).")
 
+            # --- run for all samples ---
             for i, target_class in enumerate(predicted_classes):
                 explanations.append(explain_sample(i, target_class))
                 if verbose:
                     print(f"  → Finished sample {i + 1}/{len(inputs)}")
 
+        # ------------------------- Handle Regression -------------------------
         elif self.task_type == "regression":
             if verbose:
                 print(f"Running Expected Gradients for {len(inputs)} samples (regression).")
 
+            # --- run for all samples ---
             for i in range(inputs.shape[0]):
                 explanations.append(explain_sample(int(i)))
                 if verbose:
