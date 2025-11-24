@@ -490,6 +490,27 @@ class Explainer:
             n_jobs: int = None,
             verbose: bool = True
         ) -> Tuple[np.ndarray, float]:
+        """
+        An experimental functions, which relies on influence functions, making explanations.
+
+        Args:
+            X_background (np.ndarray): Array of samples which are considered as representatives
+                of the whole the distribution.
+            y_background (np.ndarray): Ground truth labels for the background samples.
+            X_foreground (np.ndarray): Array of samples on which to calculate explanations.
+            y_foreground (np.ndarray): Ground truth labels for the foreground samples.
+            n_jobs (int): Number of parallel jobs to use. If not specified (-1, or None),
+                uses all available CPU cores. - NOT IMPLEMENTED
+            verbose (bool, optional): If True, prints progress messages. Default is True.
+
+        Returns:
+            Tuple[np.ndarray, float]:
+                - Compluted explanations.
+                - Total runtime in seconds.
+        """
+        if verbose:
+            print("Explaining using influence functions.")
+
         if isinstance(self.model, PyTorchANN):
             model = self.model.model_  
         elif isinstance(self.model, torch.nn.Module):

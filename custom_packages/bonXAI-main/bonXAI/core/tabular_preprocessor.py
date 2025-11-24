@@ -9,12 +9,15 @@ from sklearn.impute import SimpleImputer
 
 @dataclass
 class PreprocessReport:
+    """
+    Container for storing information about performed preprocessing steps.
+    """
     dropped_constant: List[str]
     dropped_id_like: List[str]
     kept_raw_columns: List[str]
     numeric_columns: List[str]
     categorical_columns: List[str]
-    task_type: str  # 'classification' or 'regression'
+    task_type: str
 
 
 class TabularPreprocessor(BaseEstimator, TransformerMixin):
@@ -41,6 +44,16 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         scale_target_in_regression: bool = False,
         random_state: int = 0,
     ):
+        """
+        Initialize the preprocessing pipeline.
+
+        Args:
+            task_type (str): Either 'classification' or 'regression'.
+            id_like_threshold (float): Uniqueness ratio threshold for identifying ID-like columns.
+            scale_all_numeric_after_encoding (bool): Whether to scale numeric features after encoding.
+            scale_target_in_regression (bool): Whether to scale the target in regression tasks.
+            random_state (int): Seed for reproducibility.
+        """
         if task_type not in ["classification", "regression"]:
             raise ValueError("task_type must be 'classification' or 'regression'")
         self.task_type = task_type
@@ -67,6 +80,17 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         self.encoded_feature_names_: Optional[List[str]] = None
 
     def fit(self, X: pd.DataFrame, y: pd.Series):
+        """
+        Fit the preprocessing pipeline on the given data.
+        Does not transform the data.
+
+        Args:
+            X (pd.DataFrame): Dataframe to fit.
+            y (pd.Series): Target variables.
+
+        Returns:
+            self
+        """
         X, y = self._validate_inputs(X, y)
 
         # drop ID-like columns (recompute after dedup)
@@ -166,7 +190,23 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         )
         return self
 
-    def transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> Tuple[pd.DataFrame, Optional[np.ndarray]]:
+    def transform(
+            self,
+            X: pd.DataFrame,
+            y: Optional[pd.Series] = None
+    ) -> Tuple[pd.DataFrame, Optional[np.ndarray]]:
+        """
+        Apply transforms to the data using the fitted preprocessing pipeline.
+
+        Args:
+            X (pd.DataFrame): Data to transform.
+            y (Optional[pd.Series]): Target variables.
+
+        Returns:
+            Tuple[pd.DataFrame, Optional[np.ndarray]]:
+                - The transformed data.
+                - Transformed target variables.
+        """
         self._check_is_fitted()
         X = X.copy()
 
@@ -237,9 +277,22 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
         return X_scaled, y_out
 
     def fit_transform(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, np.ndarray]:
+        """
+        Performs fit and transform.
+        """
         return self.fit(X, y).transform(X, y)
 
     def _validate_inputs(self, X, y):
+        """
+        Validates input X and y.
+
+        Args:
+            X: Input dataset (DataFrame or array-like).
+            y: Target variables (Series or array-like).
+
+        Returns:
+            Tuple[pd.DataFrame, np.ndarray]: (X, y)
+        """
         if not isinstance(X, pd.DataFrame):
             X = pd.DataFrame(X)
         if not isinstance(y, (pd.Series, pd.DataFrame)):
@@ -274,5 +327,8 @@ class TabularPreprocessor(BaseEstimator, TransformerMixin):
             raise RuntimeError("Preprocessor is not fitted yet. Call fit() first.")
 
     def get_report(self) -> PreprocessReport:
+        """
+        Generate report after the fitting process.
+        """
         self._check_is_fitted()
         return self.report_
