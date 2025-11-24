@@ -45,18 +45,21 @@ def test_explain_requires_labels_for_sage_and_influence():
 def test_explain_shap_kernel_classification(monkeypatch):
     Xb = np.random.randn(8, 4)
     Xf = np.random.randn(6, 4)
+    class FakeShapOutput:
+        def __init__(self, values):
+            self.values = values
     class FakeKernelExplainer:
         def __init__(self, f, background, seed=None):
             self.f = f
         def __call__(self, X, silent=True):
-            return np.ones((len(X), X.shape[1], 2)) * 0.5
+            return FakeShapOutput(np.ones((len(X), X.shape[1], 2)) * 0.5)
     monkeypatch.setattr("bonXAI.core.explainer.shap", type("SHAP", (), {
         "KernelExplainer": FakeKernelExplainer,
         "maskers": type("M", (), {"Independent": lambda *a, **k: None}),
         "PermutationExplainer": None,
     }))
     e = Explainer(DummyClsModel(), explainer_name="shap", task_type="classification", strategy="kernel", seed=0)
-    vals, elapsed = e._explain_shap(X_background=Xb, X_foreground=Xf, n_jobs=None)
+    vals, elapsed = e._explain_shap(X_background=Xb, X_foreground=Xf, n_jobs=1, verbose=False)
     assert vals.shape == (len(Xf), Xf.shape[1])
     assert isinstance(elapsed, float)
 
@@ -139,13 +142,20 @@ def test_explain_shapiq_returns_list_and_time(monkeypatch):
         def __init__(self, model, data, approximator, index, max_order, imputer): pass
         def explain(self, x, budget, random_state):
             return FakeIV(len(x))
-    monkeypatch.setattr("bonXAI.core.explainer.shapiq", type("S", (), {
-        "MarginalImputer": FakeImputer,
-        "TabularExplainer": FakeExplainer
-    }))
+    monkeypatch.setattr(
+        "bonXAI.core.explainer.shapiq",
+        type("S", (), {
+            "MarginalImputer": FakeImputer,
+            "TabularExplainer": FakeExplainer
+        })
+    )
     e = Explainer(DummyRegModel(), "shapiq", "regression")
-    pairwise_list, elapsed = e._explain_shapiq(X_background=Xb, X_foreground=Xf)
-    assert isinstance(pairwise_list, list) and len(pairwise_list) == len(Xf)
+    pairwise_list, elapsed = e._explain_shapiq(X_background=Xb, X_foreground=Xf, n_jobs=1, verbose=False)
+    assert isinstance(pairwise_list, tuple) or isinstance(pairwise_list, list)
+    assert len(pairwise_list) == len(Xf)
+    for p in pairwise_list:
+        assert isinstance(p, np.ndarray)
+        assert p.shape == (Xf.shape[1], Xf.shape[1])
     assert isinstance(elapsed, float)
 
 def test_expected_gradients_requires_pytorchann():

@@ -127,13 +127,16 @@ def test_dispatch_calls_correct_method(monkeypatch, small_data):
     X, y, model = small_data
     monkeypatch.setattr("bonXAI.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
     comp = Preprocessor(X, y, model, compression_method="iid")
-    res = comp._dispatch_compression(X, y, 0, 0, 0, 3, "gaussian", 0.5, None)
+    res = comp._dispatch_compression(X, y, 0, 0, 5, "gaussian", 0.5, None)
     assert len(res) == 4
 
 @pytest.mark.parametrize("method", ["kernel_thinning", "stein_thinning", "influence", "arfpy", "iid"])
 def test_dispatch_each_method(monkeypatch, small_data, method):
     X, y, model = small_data
-    monkeypatch.setattr("bonXAI.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
+    monkeypatch.setattr(
+        "bonXAI.core.preprocessor.resolve_kernel_params",
+        lambda name, X, seed: (b"gaussian", np.ones(2))
+    )
     pre = Preprocessor(X, y, model, compression_method=method)
     comp = Compressor(X, y, model)
     for name in [
@@ -144,7 +147,7 @@ def test_dispatch_each_method(monkeypatch, small_data, method):
         "_iid_sampling",
     ]:
         monkeypatch.setattr(Compressor, name, lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.1))
-    res = pre._dispatch_compression(X, y, 1, 1, 1, 2, "gaussian", 0.5, None)
+    res = pre._dispatch_compression(X, y, 4, 4, 4 , "gaussian", 0.5, "gaussian")
     assert isinstance(res, tuple)
     assert len(res) == 4
 
@@ -152,14 +155,14 @@ def test_dispatch_unknown_method_raises(small_data):
     X, y, model = small_data
     pre = Preprocessor(X, y, model, compression_method="nope")
     with pytest.raises(ValueError):
-        pre._dispatch_compression(X, y, 0, 0, 0, 1, "gaussian", 0.5, None)
+        pre._dispatch_compression(X, y, 0, 0, 0, "gaussian", 0.5, None)
 
 def test_preprocess_none(monkeypatch, small_data):
     X, y, model = small_data
     monkeypatch.setattr("bonXAI.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
     pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="none")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.2))
-    Xr, yr, idx, t = pre._preprocess()
+    Xr, yr, idx, t = pre.preprocess()
     assert Xr.shape[0] == 2
     assert isinstance(t, float)
 
@@ -168,7 +171,7 @@ def test_preprocess_predictions(monkeypatch, small_data):
     monkeypatch.setattr("bonXAI.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
     pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="predictions")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.2))
-    Xr, yr, idx, t = pre._preprocess()
+    Xr, yr, idx, t = pre.preprocess()
     assert Xr.shape[0] == 2
 
 def test_preprocess_stratified(monkeypatch, small_data):
@@ -180,7 +183,7 @@ def test_preprocess_stratified(monkeypatch, small_data):
     )
     pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="stratified")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.1))
-    Xr, yr, idx, t = pre._preprocess(target_size=4)
+    Xr, yr, idx, t = pre.preprocess(target_size=4)
     assert len(Xr) > 0
     assert isinstance(t, float)
 
@@ -188,7 +191,7 @@ def test_preprocess_invalid_data_mod_method(small_data):
     X, y, model = small_data
     pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="weird")
     with pytest.raises(ValueError):
-        pre._preprocess()
+        pre.preprocess()
 
 def test_predictions_mode_calls_predict_proba(monkeypatch, small_data):
     X, y, model = small_data
@@ -203,7 +206,7 @@ def test_predictions_mode_calls_predict_proba(monkeypatch, small_data):
         lambda *a, **kw: (a[1][:2], a[2][:2], np.array([0,1]), 0.02)
     )
     pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="predictions")
-    Xr, yr, idx, t = pre._preprocess()
+    Xr, yr, idx, t = pre.preprocess()
 
     assert called["proba"]
     assert Xr.shape[1] == X.shape[1] + 2
@@ -215,7 +218,7 @@ def test_dispatch_returns_matrix_when_available(monkeypatch, small_data):
         Compressor, "_influence_compression",
         lambda *a, **kw: (X[:2], y[:2], np.array([0,1]), 0.1, np.ones((2, len(X))))
     )
-    res = pre._dispatch_compression(X, y, 0, 0, 0, 2, "gaussian", 0.5, None)
+    res = pre._dispatch_compression(X, y, 0, 0, 10, "gaussian", 0.5, None)
     assert len(res) == 5
 
 def test_iid_sampling_respects_seed(small_data):

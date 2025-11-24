@@ -5,6 +5,13 @@ import os
 import random
 from bonXAI.core import utils
 
+
+def test_benchmark_lists_are_valid():
+    assert len(utils.CTR23_ALL) > 0
+    assert len(utils.CC18_ALL) > 0
+    assert all(isinstance(x, int) for x in utils.CTR23_ALL)
+    assert all(isinstance(x, int) for x in utils.CC18_ALL)
+
 def test_set_global_seed_affects_all_generators():
     utils.set_global_seed(123)
     a_np1 = np.random.rand(3)

@@ -28,7 +28,7 @@ def test_compute_mmd_nonnegative_and_zero_same_samples():
     # Same distribution -> MMD^2 should be ~0
     rng = np.random.default_rng(42)
     X = rng.normal(size=(10, 4))
-    val_same = compute_mmd(X, X, kernel="rbf", gamma=None)
+    val_same = compute_mmd(X, X, gamma=None)
     assert val_same >= -1e-12 
     assert val_same == pytest.approx(0.0, abs=1e-10)
 
@@ -36,7 +36,7 @@ def test_compute_mmd_positive_for_different_samples():
     rng = np.random.default_rng(0)
     X = rng.normal(loc=0.0, scale=1.0, size=(12, 5))
     Y = rng.normal(loc=1.0, scale=1.0, size=(10, 5))  
-    val = compute_mmd(X, Y, kernel="rbf", gamma=None)
+    val = compute_mmd(X, Y, gamma=None)
     assert val >= 0.0
     assert val > 0.0
 
@@ -45,7 +45,7 @@ def test_compute_mmd_raises_on_feature_mismatch():
     X = rng.normal(size=(8, 4))
     Y = rng.normal(size=(7, 3)) 
     with pytest.raises(ValueError):
-        compute_mmd(X, Y, kernel="rbf", gamma=None)
+        compute_mmd(X, Y, gamma=None)
 
 def test_top_k_score_1d_simple():
     exp = np.array([0.0, 0.2, 0.8, 0.5])

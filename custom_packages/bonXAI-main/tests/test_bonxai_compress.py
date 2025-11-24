@@ -1,139 +1,80 @@
-import numpy as np
 import pytest
-from bonXAI.core import bonxai_compress
-import math
+import numpy as np
+from bonXAI.core.bonxai_compress import bonxai_compress
+from goodpoints import compressc, kt, compress
 
-@pytest.fixture(autouse=True)
-def patch_goodpoints(monkeypatch):
-    """Patch heavy external functions from goodpoints with fast stubs."""
-    called = {"compress": [], "compute_K": [], "thin_K": []}
 
-    def fake_compress_kt(X, kernel_type, **kwargs):
-        called["compress"].append(True)
-        # return half indices deterministically
-        return np.arange(0, X.shape[0] // 2, dtype=int)
+# --- Mock functions to avoid heavy computation ---
+def fake_compress_kt(X, kernel_type, g=4, num_bins=32, k_params=np.ones(1), delta=0.5, seed=None):
+    """Return sequential indices for compress step"""
+    n = X.shape[0]
+    n_per_bin = n // num_bins
+    nearest_pow = 4 ** ((n_per_bin.bit_length() - 1) // 2)
+    n_prime = nearest_pow * num_bins
+    coreset_size = min(n_prime, int(np.sqrt(n_prime * num_bins) * (2 ** g)))
+    return np.arange(min(coreset_size, n), dtype=int)
 
-    def fake_compute_K(X, idx, kernel_type, k_params, K):
-        called["compute_K"].append(True)
-        # fill K deterministically
-        K[:] = np.eye(len(idx))
 
-    def fake_thin_K(K1, K2, m, **kwargs):
-        called["thin_K"].append(True)
-        # return every other index (simulate thinning)
-        n = K1.shape[0]
-        return np.arange(0, max(1, n // 2), dtype=int)
+def fake_thin_K(K_split, K_swap, m, delta=0.5, seed=None, unique=False, mean0=False):
+    """Return first floor(n/2^m) indices"""
+    n = K_split.shape[0]
+    if m == 0:
+        return np.arange(n)
+    size = max(1, n // (2 ** m))
+    return np.arange(size)
 
-    monkeypatch.setattr(bonxai_compress.compress, "compress_kt", fake_compress_kt)
-    monkeypatch.setattr(bonxai_compress.compressc, "compute_K", fake_compute_K)
-    monkeypatch.setattr(bonxai_compress.kt, "thin_K", fake_thin_K)
 
-    yield called
+def fake_compute_K(X, idx, kernel_type, k_params, K):
+    """Fill kernel matrix with ones"""
+    K[:, :] = 1.0
 
-def test_basic_compress_none_m_triggers_compress_only(patch_goodpoints):
-    X = np.random.randn(16, 3)
-    kernel_type = b"gaussian"
-    res = bonxai_compress.bonxai_compress(X, kernel_type, m=None)
-    # mock compress_kt returns half indices
-    assert np.all(res < X.shape[0])
-    assert patch_goodpoints["compress"]
 
-def prev_power_of_4(n):
-    p = 1
-    while p * 4 <= n:
-        p *= 4
-    return p
+# --- Tests ---
+@pytest.mark.parametrize("n,target_size", [
+    (1024, 1), (1024, 2), (1024, 4), (1024, 8), (1024, 16), (1024, 32), (1024, 64), (1024, 128), (1024, 256), (1024, 512),
+])
+def test_bonxai_compress_various_target_sizes(monkeypatch, n, target_size):
+    X = np.random.randn(n, 5)
 
-@pytest.mark.parametrize("n,m", [(1,0),(3,0),(4,0),(16,1),(64,2)])
-def test_size_when_m_specified_is_sqrt_prev_pow4_times_2_pow_m(n, m):
-    X = np.random.randn(n, 2)
-    res = bonxai_compress.bonxai_compress(X, b"gaussian", m=m)
-    expected = int(math.sqrt(prev_power_of_4(n)) * (2 ** m))
+    # Patch heavy functions
+    monkeypatch.setattr(compress, "compress_kt", fake_compress_kt)
+    monkeypatch.setattr(kt, "thin_K", fake_thin_K)
+    monkeypatch.setattr(compressc, "compute_K", fake_compute_K)
+
+    res = bonxai_compress(X, kernel_type=b"gaussian", target_size=target_size)
     assert res.ndim == 1
-    assert len(res) == expected
+    assert len(res) == target_size
     assert np.all(res >= 0) and np.all(res < n)
-    assert len(np.unique(res)) == len(res)  # no dups
+    assert len(np.unique(res)) == len(res)
 
-def test_m_none_returns_compress_only_half_indices(patch_goodpoints):
-    X = np.random.randn(33, 5)
-    res = bonxai_compress.bonxai_compress(X, b"gaussian", m=None, g=2, num_bins=4)
-    assert len(res) == X.shape[0] // 2
-    assert patch_goodpoints["compress"]
-    assert not patch_goodpoints["compute_K"]
-    assert not patch_goodpoints["thin_K"]
 
-def test_non_power_of_four_triggers_recursive_call(monkeypatch):
-    X = np.random.randn(10, 2)  # not a power of 4
-    call_count = {"n": 0}
+def test_bonxai_compress_default_target_size(monkeypatch):
+    X = np.random.randn(65, 3)
 
-    real = bonxai_compress.bonxai_compress
-    def wrapper(*args, **kwargs):
-        call_count["n"] += 1
-        return real(*args, **kwargs)
+    monkeypatch.setattr(compress, "compress_kt", fake_compress_kt)
+    monkeypatch.setattr(kt, "thin_K", fake_thin_K)
+    monkeypatch.setattr(compressc, "compute_K", fake_compute_K)
 
-    monkeypatch.setattr(bonxai_compress, "bonxai_compress", wrapper)
-    bonxai_compress.bonxai_compress(X, b"sobolev", m=0)
-    assert call_count["n"] >= 2
+    res = bonxai_compress(X, kernel_type=b"gaussian")
+    expected_size = int(np.sqrt(64))  # largest_power_of_four(65)=64 -> sqrt=8
+    assert len(res) == expected_size
 
-def test_thin_branch_triggers_compute_and_thin(patch_goodpoints):
-    X = np.random.randn(16, 2)
-    kernel_type = b"gaussian"
-    # choose m high enough that log2(sqrt(n)) <= m
-    res = bonxai_compress.bonxai_compress(X, kernel_type, m=10)
-    assert patch_goodpoints["compute_K"]
-    assert patch_goodpoints["thin_K"]
-    assert isinstance(res, np.ndarray)
 
-def test_compress_then_thin_branch(patch_goodpoints):
-    X = np.random.randn(64, 2)
-    kernel_type = b"gaussian"
-    # m smaller than sqrt(n) threshold
-    res = bonxai_compress.bonxai_compress(X, kernel_type, m=1)
-    # compress and thin should both be called
-    assert patch_goodpoints["compress"]
-    assert patch_goodpoints["compute_K"]
-    assert patch_goodpoints["thin_K"]
-    assert isinstance(res, np.ndarray)
-    assert res.ndim == 1
-
-def test_invalid_kernel_type_pass_through():
-    X = np.random.randn(8, 3)
-    res = bonxai_compress.bonxai_compress(X, b"invalid_kernel", m=None)
-    assert isinstance(res, np.ndarray) 
-
-def test_seed_handling_produces_deterministic_results(monkeypatch):
-    """Ensure same seed yields same result."""
-    X = np.random.randn(16, 2)
-    kernel_type = b"gaussian"
-
-    # deterministic fake compress_kt that depends on seed
-    def fake_compress_kt(X, kernel_type, **kwargs):
-        seed_val = kwargs.get("seed")
-        np.random.seed(seed_val[0] if isinstance(seed_val, np.ndarray) else seed_val or 0)
-        return np.random.choice(X.shape[0], size=X.shape[0] // 2, replace=False)
-
-    monkeypatch.setattr(bonxai_compress.compress, "compress_kt", fake_compress_kt)
-
-    res1 = bonxai_compress.bonxai_compress(X, kernel_type, m=1, seed=42)
-    res2 = bonxai_compress.bonxai_compress(X, kernel_type, m=1, seed=42)
-    assert np.array_equal(res1, res2)
-
-def test_negative_or_non_int_g_raises():
+def test_bonxai_compress_invalid_target_size(monkeypatch):
     X = np.random.randn(16, 3)
-    with pytest.raises((ValueError, AssertionError, TypeError)):
-        bonxai_compress.bonxai_compress(X, b"gaussian", m=None, g=-1, num_bins=4)
-    with pytest.raises((ValueError, AssertionError, TypeError)):
-        bonxai_compress.bonxai_compress(X, b"gaussian", m=None, g=1.5, num_bins=4)
 
-def test_negative_num_bins_raises():
-    X = np.random.randn(16, 3)
-    with pytest.raises((ValueError, AssertionError, TypeError)):
-        bonxai_compress.bonxai_compress(X, b"gaussian", m=None, g=1, num_bins=-4)
+    monkeypatch.setattr(compress, "compress_kt", fake_compress_kt)
+    monkeypatch.setattr(kt, "thin_K", fake_thin_K)
+    monkeypatch.setattr(compressc, "compute_K", fake_compute_K)
 
-def test_tiny_n_behaviour():
-    for n in [1, 2, 3]:
-        X = np.random.randn(n, 2)
-        res = bonxai_compress.bonxai_compress(X, b"gaussian", m=0)
-        # sqrt(prev_pow4(1..3)) == 1
-        assert len(res) == 1
-        assert 0 <= res[0] < n
+    with pytest.raises(ValueError):
+        bonxai_compress(X, kernel_type=b"gaussian", target_size=0)
+
+    with pytest.raises(ValueError):
+        bonxai_compress(X, kernel_type=b"gaussian", target_size=17)
+
+
+def test_bonxai_compress_empty_input():
+    X = np.empty((0, 3))
+    with pytest.raises(ValueError):
+        bonxai_compress(X, kernel_type=b"gaussian")

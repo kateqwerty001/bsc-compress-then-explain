@@ -43,8 +43,8 @@ class DataLoader:
 
         # --- Load data ---
         _, loader_test = ReturnLoaders(data_name=dataset_name, download=True, batch_size=128)
-        X_test = loader_test.dataset.data.to_numpy()
-        y_test = loader_test.dataset.targets.to_numpy()
+        X_test = np.asarray(loader_test.dataset.data)
+        y_test = np.asarray(loader_test.dataset.targets)
 
         # --- Load model ---
         model = LoadModel(data_name=dataset_name, ml_model=model_name, pretrained=True)
