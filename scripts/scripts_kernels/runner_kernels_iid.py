@@ -3,7 +3,7 @@
 #  SHAP & SAGE EXPLAINERS ON ANN AND XGBOOST MODELS - KERNEL THINNING AND IID SAMPLING
 # ============================================================
 import os
-from bonXAI.core.utils import CC18_SMALL, CTR23_SMALL
+from thinX.core.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
 n_repeats = 10
@@ -71,7 +71,7 @@ for model_name in model_names:
 #  EXPECTED GRADIENTS ON ANN MODELS - KERNEL THINNING AND IID SAMPLING
 # ============================================================
 import os
-from bonXAI.core.utils import CC18_LARGE, CTR23_LARGE
+from thinX.core.utils import CC18_LARGE, CTR23_LARGE
 
 model_name = "ann"
 

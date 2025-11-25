@@ -51,12 +51,12 @@ def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_for
             print(f"Repeat {i+1}/{N_REPEATS}, target size: {target_size}")
             
             if compression_method == "stein_thinning":
-                X_comp, y_comp, idx_comp, t_comp = pre._preprocess(
+                X_comp, y_comp, idx_comp, t_comp = pre.preprocess(
                     target_size=target_size, 
                     grad_type=b'gaussian'
                 )
             else:
-                X_comp, y_comp, idx_comp, t_comp = pre._preprocess(
+                X_comp, y_comp, idx_comp, t_comp = pre.preprocess(
                     target_size=target_size
                 )
 

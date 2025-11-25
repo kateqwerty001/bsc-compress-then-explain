@@ -3,7 +3,7 @@
 #  SHAP & SAGE EXPLAINERS ON ANN AND XGBOOST MODELS
 # ============================================================
 import os
-from bonXAI.core.utils import CC18_SMALL, CTR23_SMALL
+from thinX.core.utils import CC18_SMALL, CTR23_SMALL
 
 model_names = ["ann", "xgboost"]
 
@@ -64,7 +64,7 @@ for model_name in model_names:
 #  EXPECTED GRADIENTS ON ANN MODELS
 # ============================================================
 import os
-from bonXAI.core.utils import CC18_LARGE, CTR23_LARGE
+from thinX.core.utils import CC18_LARGE, CTR23_LARGE
 
 model_name = "ann"
 

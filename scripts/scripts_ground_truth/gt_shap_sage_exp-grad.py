@@ -1,11 +1,11 @@
 import os
 import sys
 import numpy as np
-from bonXAI.core.explainer import Explainer
+from thinX.core.explainer import Explainer
 import argparse
-from bonXAI.core.utils import compresspp_kt_output_size, set_global_seed
-from bonXAI.core.data_loader import DataLoader
-from bonXAI.core.utils import CC18_ALL, CTR23_ALL
+from thinX.core.utils import set_global_seed
+from thinX.core.data_loader import DataLoader
+from thinX.core.utils import CC18_ALL, CTR23_ALL
 
 sys.stdout.reconfigure(line_buffering=True)
 

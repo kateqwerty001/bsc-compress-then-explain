@@ -16,7 +16,7 @@ explainers = [
     ("shapiq", "kernel", 16),
 ]
 
-compression_methods = ["stein_thinning"]
+compression_methods = ["arfpy"]
 data_modification_method = ["none"]
 
 print("[START] Generating and submitting SLURM jobs for small datasets \n")
@@ -30,7 +30,14 @@ for data_modification in data_modification_method:
                     
                     mem_gb = "50G"
 
-                    job_name = f"st_{dataset_name}_{explainer_name}_{model_name}_{compression_method}_{data_modification}"
+                    if compression_method == "influence":
+                        prefix = "i"
+                    elif compression_method == "stein_thinning":
+                        prefix = "st"
+                    elif compression_method == "arfpy":
+                        prefix = "a"
+
+                    job_name = f"{prefix}_{dataset_name}_{explainer_name}_{model_name}_{compression_method}_{data_modification}"
                     sh_file = f"run_{job_name}.sh"
 
                     path_to_script = "/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/scripts_other_baselines/other_baselines.py"
@@ -40,8 +47,8 @@ for data_modification in data_modification_method:
 
                         f.write(f"""#!/bin/bash
 #SBATCH -A mi2lab-normal
-#SBATCH -p short
-#SBATCH --time=24:00:00
+#SBATCH -p long
+#SBATCH --time=48:00:00
 #SBATCH --nodes=1
 #SBATCH --mem={mem_gb}
 #SBATCH --nodelist=dgx-1,dgx-2,dgx-3,dgx-4

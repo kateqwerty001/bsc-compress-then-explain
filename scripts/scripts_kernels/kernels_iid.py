@@ -1,16 +1,14 @@
 import numpy as np
 import pandas as pd
 import os
-import time
 import sys
-from bonXAI.core.preprocessor import Preprocessor
-from bonXAI.core.explainer import Explainer
-from bonXAI.core.evaluation import Evaluator
-from bonXAI.core.utils import set_global_seed
-from openxai.model import LoadModel, ReturnLoaders
-from bonXAI.core.data_loader import DataLoader
+from thinX.core.preprocessor import Preprocessor
+from thinX.core.explainer import Explainer
+from thinX.core.evaluation import Evaluator
+from thinX.core.utils import set_global_seed
+from thinX.core.data_loader import DataLoader
 from goodpoints import compress
-from bonXAI.core.utils import CC18_ALL, CTR23_ALL
+from thinX.core.utils import CC18_ALL, CTR23_ALL
 import argparse
 import hashlib
 import math
@@ -49,7 +47,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                 )
                 print(f"Repeat {i+1}/{N_REPEATS}, Kernel: {kernel}, Target Size: {target_size}")
                 
-                X_kt, y_kt, idx_kt, t_kt = pre._preprocess(
+                X_kt, y_kt, idx_kt, t_kt = pre.preprocess(
                     g=4,
                     num_bins=32,
                     target_size=target_size,                        
@@ -93,7 +91,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                 data_modification_method="none",
                 seed=seed + j + i
             )
-            X_iid, y_iid, idx_iid, t_iid = pre._preprocess(target_size=i)
+            X_iid, y_iid, idx_iid, t_iid = pre.preprocess(target_size=i)
             explainer = Explainer(
                 model=model,
                 task_type=task_type,
