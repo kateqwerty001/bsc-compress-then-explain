@@ -1,6 +1,6 @@
 from typing import Tuple
 import numpy as np
-from bonXAI.core.utils import median_pairwise_distance_sample
+from thinX.core.utils import median_pairwise_distance_sample
 
 
 def resolve_kernel_params(name: str, X: np.ndarray, seed: int) -> Tuple[bytes, np.ndarray]:

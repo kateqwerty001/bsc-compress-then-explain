@@ -1,8 +1,8 @@
 import numpy as np
 from typing import Optional, Tuple, Union, List
 import time
-from bonXAI.core.bonxai_compress import bonxai_compress
-from bonXAI.core.kernel import resolve_kernel_params
+from thinX.core.thinx_compress import thinx_compress
+from thinX.core.kernel import resolve_kernel_params
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from pydvl.influence.torch import CgInfluence
@@ -70,7 +70,7 @@ class Compressor:
             - Compression time.
         """
         start = time.time()
-        indices = bonxai_compress(
+        indices = thinx_compress(
             self.X, kernel_type, k_params, g=g, num_bins=num_bins, target_size=target_size, delta=delta, seed=self.seed
         )
         end = time.time()
@@ -333,8 +333,8 @@ class Preprocessor:
         Args:
             X_mod (np.ndarray): Array of samples after applying `data_modification_method`.
             y_mod (np.ndarray): Array of target values.
-            g (int): Oversampling parameter in `bonxai_compress()`.
-            num_bins (int): Number of bins in `bonxai_compress()`.
+            g (int): Oversampling parameter in `thinx_compress()`.
+            num_bins (int): Number of bins in `thinx_compress()`.
             target_size (int): Desired number of samples after compression.
             kernel (str): Kernel type used in kernel thinning.
                 Options: {"gaussian", "sobolev", "ineverse_multiquadric", "matern"}
@@ -387,8 +387,8 @@ class Preprocessor:
         modification and the selected compression method.
 
         Args:
-            g (int): Oversampling parameter in `bonxai_compress()`.
-            num_bins (int): Number of bins in `bonxai_compress()`.
+            g (int): Oversampling parameter in `thinx_compress()`.
+            num_bins (int): Number of bins in `thinx_compress()`.
             target_size (int): Desired number of samples after compression.
             kernel (str): Kernel type used in kernel thinning.
                 Options: {"gaussian", "sobolev", "ineverse_multiquadric", "matern"}

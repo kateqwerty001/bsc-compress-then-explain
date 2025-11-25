@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
-
-from bonXAI.core.metrics import (
+from thinX.core.metrics import (
     compute_mae,
     compute_mmd,
     top_k_score,

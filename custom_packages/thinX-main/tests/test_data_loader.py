@@ -1,10 +1,10 @@
 import pytest
 import numpy as np
 import torch
-from bonXAI.core.data_loader import DataLoader
-from bonXAI.core.pytorch_ann import PyTorchANN
+from thinX.core.data_loader import DataLoader
+from thinX.core.pytorch_ann import PyTorchANN
 from xgboost import XGBClassifier, XGBRegressor
-from bonXAI.core.tabular_preprocessor import TabularPreprocessor
+from thinX.core.tabular_preprocessor import TabularPreprocessor
 
 # Use white_wine dataset (ID=44971) from OpenML
 OPENML_DATASET_ID = 44971

@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 from unittest.mock import patch
-from bonXAI.core import kernel
+from thinX.core import kernel
 
 
 def test_gaussian_kernel_params():
     X = np.zeros((10, 5))
-    with patch("bonXAI.core.kernel.median_pairwise_distance_sample", return_value=np.sqrt(10)):
+    with patch("thinX.core.kernel.median_pairwise_distance_sample", return_value=np.sqrt(10)):
         ktype, params = kernel.resolve_kernel_params("gaussian", X=X, seed=42)
 
     assert ktype == b"gaussian"
@@ -20,7 +20,7 @@ def test_gaussian_kernel_params():
 ])
 def test_simple_kernels(name, expected_type, expected_params):
     X = np.zeros((8, 3))
-    with patch("bonXAI.core.kernel.median_pairwise_distance_sample", return_value=np.sqrt(10)):
+    with patch("thinX.core.kernel.median_pairwise_distance_sample", return_value=np.sqrt(10)):
         ktype, params = kernel.resolve_kernel_params(name, X, seed=42)
 
     assert ktype == expected_type
@@ -30,7 +30,7 @@ def test_simple_kernels(name, expected_type, expected_params):
 @pytest.mark.parametrize("nu", [0.5, 1.5, 2.5])
 def test_matern_kernel(nu):
     X = np.zeros((4, 2))
-    with patch("bonXAI.core.kernel.median_pairwise_distance_sample", return_value=2.0):
+    with patch("thinX.core.kernel.median_pairwise_distance_sample", return_value=2.0):
         ktype, params = kernel.resolve_kernel_params("matern", X, seed=42)
 
     assert ktype == b"matern"
@@ -47,7 +47,7 @@ def test_unknown_kernel_raises():
 @pytest.mark.parametrize("d", [1, 2, 7, 32])
 def test_gaussian_sigma_positive_and_scales_with_features(d):
     X = np.zeros((5, d))
-    with patch("bonXAI.core.kernel.median_pairwise_distance_sample", return_value=1.0):
+    with patch("thinX.core.kernel.median_pairwise_distance_sample", return_value=1.0):
         _, p = kernel.resolve_kernel_params("gaussian", X, seed=42)
 
     assert p.shape == (1,)
@@ -59,7 +59,7 @@ def test_all_params_are_float64(name):
     X = np.zeros((3, 4))
 
     if name in ["gaussian", "inverse_multiquadric"]:
-        with patch("bonXAI.core.kernel.median_pairwise_distance_sample", return_value=1.0):
+        with patch("thinX.core.kernel.median_pairwise_distance_sample", return_value=1.0):
             _, p = kernel.resolve_kernel_params(name, X, seed=42)
     else:
         _, p = kernel.resolve_kernel_params(name, X, seed=42)

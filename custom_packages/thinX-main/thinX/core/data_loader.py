@@ -2,9 +2,9 @@ import numpy as np
 import openml
 import torch
 from typing import Union, Tuple, Optional
-from bonXAI.core.pytorch_ann import PyTorchANN
-from bonXAI.core.tabular_preprocessor import TabularPreprocessor
-from bonXAI.core.utils import CC18_ALL, CTR23_ALL
+from thinX.core.pytorch_ann import PyTorchANN
+from thinX.core.tabular_preprocessor import TabularPreprocessor
+from thinX.core.utils import CC18_ALL, CTR23_ALL
 from numpy import ndarray
 from openxai.model import LoadModel, ReturnLoaders
 from sklearn.model_selection import train_test_split

@@ -42,7 +42,7 @@ def compute_m(n: int, target_size: int, g: int, num_bins: int) -> int:
     n_prime = num_bins * largest_power_of_four(math.floor(n / num_bins))
     compress_coreset_size = min(2**g * math.sqrt(n_prime * num_bins), n_prime)
     if target_size > compress_coreset_size:
-        raise ValueError("target_size is too large for bonxai_compress with set num_bins and g parameters")
+        raise ValueError("target_size is too large for thinx_compress with set num_bins and g parameters")
     if target_size == compress_coreset_size:
         return 0
     else:
@@ -51,7 +51,7 @@ def compute_m(n: int, target_size: int, g: int, num_bins: int) -> int:
             total_halvings += 1
         return total_halvings
 
-def bonxai_compress(
+def thinx_compress(
         X: np.ndarray,
         kernel_type: bytes,
         k_params: Union[np.ndarray, float] = np.ones(1),
@@ -101,7 +101,7 @@ def bonxai_compress(
     # --- power of 4 using standard thinning (i.e., by retaining every t-th index) ---
     if nearest_pow_four != n:
         input_indices = np.linspace(n-1, 0, nearest_pow_four, dtype=int)[::-1]
-        return input_indices[ bonxai_compress(
+        return input_indices[ thinx_compress(
             X[input_indices], kernel_type, k_params=k_params, g=g, 
             num_bins=num_bins, target_size=target_size, delta=delta, seed=seed, mean0=mean0) ]
 

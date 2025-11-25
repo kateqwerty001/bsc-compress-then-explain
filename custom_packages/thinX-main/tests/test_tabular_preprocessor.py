@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import pandas as pd
-from bonXAI.core.tabular_preprocessor import TabularPreprocessor, PreprocessReport
+from thinX.core.tabular_preprocessor import TabularPreprocessor, PreprocessReport
 
 def make_classification_df():
     X = pd.DataFrame({

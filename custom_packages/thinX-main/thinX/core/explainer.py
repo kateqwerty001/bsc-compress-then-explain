@@ -7,11 +7,11 @@ import sage
 import torch
 import joblib
 import captum
-from bonXAI.core.pytorch_ann import PyTorchANN
+from thinX.core.pytorch_ann import PyTorchANN
 import shapiq
 from torch.utils.data import DataLoader, TensorDataset
 from pydvl.influence.torch import CgInfluence
-from bonXAI.core.utils import set_global_seed
+from thinX.core.utils import set_global_seed
 
 try:
     if hasattr(sys.stdout, "reconfigure"):

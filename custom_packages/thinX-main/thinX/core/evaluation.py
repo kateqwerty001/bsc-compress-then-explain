@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Dict
-from bonXAI.core.metrics import compute_mae, compute_mmd, top_k_score, topk_pair_overlap
+from thinX.core.metrics import compute_mae, compute_mmd, top_k_score, topk_pair_overlap
 
 class Evaluator:
     """

@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bonXAI"
+name = "thinX"
 version = "0.1.0"
-description = "Explainable AI package"
+description = "A package for experimenting with different distribution compression and XAI methods"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
@@ -13,4 +13,4 @@ dependencies = []
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["bonXAI*"]
+include = ["thinX*"]

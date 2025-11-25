@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 import torch
-
-from bonXAI.core.pytorch_ann import BasicNeuralNetwork, PyTorchANN
+from thinX.core.pytorch_ann import BasicNeuralNetwork, PyTorchANN
 
 def test_basic_network_forward_shape():
     n_in, n_out = 4, 3
