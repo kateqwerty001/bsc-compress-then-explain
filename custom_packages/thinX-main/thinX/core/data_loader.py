@@ -2,7 +2,7 @@ import numpy as np
 import openml
 import torch
 from typing import Union, Tuple, Optional
-from thinX.core.pytorch_ann import PyTorchANN
+from thinX.core.pytorch_nn import PyTorchNN
 from thinX.core.tabular_preprocessor import TabularPreprocessor
 from thinX.core.utils import CC18_ALL, CTR23_ALL
 from numpy import ndarray
@@ -54,7 +54,7 @@ class DataLoader:
 
     def _get_model(
             self, model_name: str, task_type: str, random_state: int
-    ) -> Union[PyTorchANN, XGBClassifier, XGBRegressor]:
+    ) -> Union[PyTorchNN, XGBClassifier, XGBRegressor]:
         """
         Initialize a model based on its name and task type - used for datasets from OpenML.
 
@@ -70,7 +70,7 @@ class DataLoader:
             ValueError: If model_name is not supported.
         """
         model_map = {
-            "ann": PyTorchANN(task_type=task_type, random_state=0),
+            "ann": PyTorchNN(task_type=task_type, random_state=0),
             "xgboost": (
                 XGBClassifier(n_estimators=200, random_state=random_state)
                 if task_type == "classification"
@@ -93,7 +93,7 @@ class DataLoader:
         ndarray,
         ndarray,
         Optional[ndarray],
-        Union[PyTorchANN, XGBClassifier, XGBRegressor],
+        Union[PyTorchNN, XGBClassifier, XGBRegressor],
         TabularPreprocessor
     ]:
         """

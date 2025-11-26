@@ -41,9 +41,9 @@ class BasicNeuralNetwork(nn.Module):
         return self.network(x)
         
         
-class PyTorchANN(BaseEstimator):
+class PyTorchNN(BaseEstimator):
     """
-    PyTorch Artificial Neural Network compatible with scikit-learn.
+    PyTorch Neural Network compatible with scikit-learn.
 
     Architecture: Input -> Linear(100) -> ReLU -> Linear(100) -> ReLU -> Linear(Output)
 
@@ -78,7 +78,7 @@ class PyTorchANN(BaseEstimator):
         X: Union[pd.DataFrame, np.ndarray],
         y: np.ndarray,
         verbose: bool = False
-    ) -> 'PyTorchANN':
+    ) -> 'PyTorchNN':
         """
         Train the neural network with early stopping.
 
@@ -88,7 +88,7 @@ class PyTorchANN(BaseEstimator):
             verbose (bool): Indicator of printing progress during training.
 
         Returns:
-            PyTorchANN: Fitted estimator.
+            PyTorchNN: Fitted estimator.
 
         Raises:
             ValueError:

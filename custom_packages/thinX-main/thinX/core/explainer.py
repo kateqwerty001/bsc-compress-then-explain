@@ -7,7 +7,7 @@ import sage
 import torch
 import joblib
 import captum
-from thinX.core.pytorch_ann import PyTorchANN
+from thinX.core.pytorch_nn import PyTorchNN
 import shapiq
 from torch.utils.data import DataLoader, TensorDataset
 from pydvl.influence.torch import CgInfluence
@@ -410,14 +410,14 @@ class Explainer:
                     per-batch explanation time.
 
         Raises:
-            TypeError: If model is not a PyTorchANN instance.
+            TypeError: If model is not a PyTorchNN instance.
             ValueError: If task_type is not 'classification' or 'regression'.
         """
         print(f"Explaining with Expected Gradients. {len(X_foreground)} samples to explain using {len(X_background)} background samples.")
         start = time.time()
 
-        if not isinstance(self.model, PyTorchANN):
-            raise TypeError("model must be an instance of PyTorchANN")
+        if not isinstance(self.model, PyTorchNN):
+            raise TypeError("model must be an instance of PyTorchNN")
 
         inputs = torch.as_tensor(X_foreground, dtype=torch.float32)
         baselines = torch.as_tensor(X_background, dtype=torch.float32)
@@ -511,12 +511,12 @@ class Explainer:
         if verbose:
             print("Explaining using influence functions.")
 
-        if isinstance(self.model, PyTorchANN):
+        if isinstance(self.model, PyTorchNN):
             model = self.model.model_  
         elif isinstance(self.model, torch.nn.Module):
             model = self.model
         else:
-            raise TypeError("Influence explainer requires a PyTorch model or PyTorchANN wrapper.")
+            raise TypeError("Influence explainer requires a PyTorch model or PyTorchNN wrapper.")
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = model.to(device)
