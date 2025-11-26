@@ -27,7 +27,7 @@ def small_data():
 def test_kernel_thinning(monkeypatch, small_data):
     X, y, model = small_data
     indices = np.arange(5)
-    monkeypatch.setattr("thinX.core.preprocessor.thinx_compress", lambda *a, **kw: indices)
+    monkeypatch.setattr("thinx.core.preprocessor.thinx_compress", lambda *a, **kw: indices)
     comp = Compressor(X, y, model)
     Xr, yr, idx, t = comp._kernel_thinning(1, 2, 3, 0.5, b"gaussian", np.ones(2))
     assert np.allclose(Xr, X[idx])
@@ -37,7 +37,7 @@ def test_kernel_thinning(monkeypatch, small_data):
 
 def test_stein_thinning_gaussian(monkeypatch, small_data):
     X, y, model = small_data
-    monkeypatch.setattr("thinX.core.preprocessor.thin", lambda X, grad, m: np.arange(min(len(X), 4)))
+    monkeypatch.setattr("thinx.core.preprocessor.thin", lambda X, grad, m: np.arange(min(len(X), 4)))
     comp = Compressor(X, y, model)
     Xr, yr, idx, t = comp._stein_thinning(4, b"gaussian")
     assert Xr.shape[1] == X.shape[1]
@@ -46,7 +46,7 @@ def test_stein_thinning_gaussian(monkeypatch, small_data):
 
 def test_stein_thinning_kde(monkeypatch, small_data):
     X, y, model = small_data
-    monkeypatch.setattr("thinX.core.preprocessor.thin", lambda X, grad, m: np.arange(3))
+    monkeypatch.setattr("thinx.core.preprocessor.thin", lambda X, grad, m: np.arange(3))
     comp = Compressor(X, y, model)
     Xr, yr, idx, t = comp._stein_thinning(3, b"kde")
     assert Xr.shape == (3, X.shape[1])
@@ -61,8 +61,8 @@ def test_stein_thinning_gmm(monkeypatch, small_data):
         @property
         def covariances_(self): return np.stack([np.eye(X.shape[1])]*2)
         def predict_proba(self, X): return np.full((len(X), 2), 0.5)
-    monkeypatch.setattr("thinX.core.preprocessor.GaussianMixture", FakeGMM)
-    monkeypatch.setattr("thinX.core.preprocessor.thin", lambda X, grad, m: np.arange(5))
+    monkeypatch.setattr("thinx.core.preprocessor.GaussianMixture", FakeGMM)
+    monkeypatch.setattr("thinx.core.preprocessor.thin", lambda X, grad, m: np.arange(5))
     comp = Compressor(X, y, model)
     Xr, yr, idx, t = comp._stein_thinning(5, b"gmm")
     assert Xr.shape == (5, X.shape[1])
@@ -84,7 +84,7 @@ def test_influence_compression(monkeypatch, small_data):
         def fit(self, loader): return self
         def influences(self, Xt, yt, Xtr, ytr, mode="up"):
             return torch.ones((len(Xt), len(Xtr)))
-    monkeypatch.setattr("thinX.core.preprocessor.CgInfluence", FakeInf)
+    monkeypatch.setattr("thinx.core.preprocessor.CgInfluence", FakeInf)
     comp = Compressor(X, y, torch_model)
     Xr, yr, idx, t, mat = comp._influence_compression(target_size=4)
     assert Xr.shape[0] == 4
@@ -101,7 +101,7 @@ def test_arfpy_compression(monkeypatch, small_data):
             d = {f"feat_{i}": np.random.randn(n) for i in range(X.shape[1])}
             d["label"] = np.random.randint(0, 2, n)
             return pd.DataFrame(d)
-    monkeypatch.setattr("thinX.core.preprocessor.arf_mod", type("M", (), {"arf": FakeARF}))
+    monkeypatch.setattr("thinx.core.preprocessor.arf_mod", type("M", (), {"arf": FakeARF}))
     comp = Compressor(X, y, model)
     Xr, yr, idx, t = comp._arfpy_compression(target_size=5)
     assert Xr.shape == (5, X.shape[1])
@@ -125,7 +125,7 @@ def test_data_with_predictions(small_data):
 
 def test_dispatch_calls_correct_method(monkeypatch, small_data):
     X, y, model = small_data
-    monkeypatch.setattr("thinX.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
+    monkeypatch.setattr("thinx.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
     comp = Preprocessor(X, y, model, compression_method="iid")
     res = comp._dispatch_compression(X, y, 0, 0, 5, "gaussian", 0.5, None)
     assert len(res) == 4
@@ -134,7 +134,7 @@ def test_dispatch_calls_correct_method(monkeypatch, small_data):
 def test_dispatch_each_method(monkeypatch, small_data, method):
     X, y, model = small_data
     monkeypatch.setattr(
-        "thinX.core.preprocessor.resolve_kernel_params",
+        "thinx.core.preprocessor.resolve_kernel_params",
         lambda name, X, seed: (b"gaussian", np.ones(2))
     )
     pre = Preprocessor(X, y, model, compression_method=method)
@@ -159,7 +159,7 @@ def test_dispatch_unknown_method_raises(small_data):
 
 def test_preprocess_none(monkeypatch, small_data):
     X, y, model = small_data
-    monkeypatch.setattr("thinX.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
+    monkeypatch.setattr("thinx.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
     pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="none")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.2))
     Xr, yr, idx, t = pre.preprocess()
@@ -168,7 +168,7 @@ def test_preprocess_none(monkeypatch, small_data):
 
 def test_preprocess_predictions(monkeypatch, small_data):
     X, y, model = small_data
-    monkeypatch.setattr("thinX.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
+    monkeypatch.setattr("thinx.core.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
     pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="predictions")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.2))
     Xr, yr, idx, t = pre.preprocess()

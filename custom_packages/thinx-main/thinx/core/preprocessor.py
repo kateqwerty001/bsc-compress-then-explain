@@ -1,8 +1,8 @@
 import numpy as np
 from typing import Optional, Tuple, Union, List
 import time
-from thinX.core.thinx_compress import thinx_compress
-from thinX.core.kernel import resolve_kernel_params
+from thinx.core.thinx_compress import thinx_compress
+from thinx.core.kernel import resolve_kernel_params
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from pydvl.influence.torch import CgInfluence
