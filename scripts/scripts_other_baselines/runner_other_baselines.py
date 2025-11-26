@@ -4,7 +4,7 @@
 #  STEIN THINNING COMPRESSION
 # ============================================================
 import os
-from bonXAI.core.utils import CC18_SMALL, CTR23_SMALL
+from thinx.core.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
 
@@ -75,6 +75,3 @@ for data_modification in data_modification_method:
                     os.system(f"chmod +x {sh_file}")
                     os.system(f"sbatch {sh_file}")
                     print(f"--> Submitted job: {job_name}")
-
-
-

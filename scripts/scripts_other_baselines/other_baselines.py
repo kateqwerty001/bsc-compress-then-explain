@@ -3,14 +3,14 @@ import pandas as pd
 import os
 import time
 import sys
-from bonXAI.core.preprocessor import Preprocessor
-from bonXAI.core.explainer import Explainer
-from bonXAI.core.evaluation import Evaluator
-from bonXAI.core.utils import set_global_seed
+from thinx.core.preprocessor import Preprocessor
+from thinx.core.explainer import Explainer
+from thinx.core.evaluation import Evaluator
+from thinx.core.utils import set_global_seed
 from openxai.model import LoadModel, ReturnLoaders
-from bonXAI.core.data_loader import DataLoader
+from thinx.core.data_loader import DataLoader
 from goodpoints import compress
-from bonXAI.core.utils import CC18_ALL, CTR23_ALL
+from thinx.core.utils import CC18_ALL, CTR23_ALL
 import argparse
 import hashlib
 import math

@@ -2,13 +2,13 @@ import numpy as np
 import pandas as pd
 import os
 import sys
-from thinX.core.preprocessor import Preprocessor
-from thinX.core.explainer import Explainer
-from thinX.core.evaluation import Evaluator
-from thinX.core.utils import set_global_seed
-from thinX.core.data_loader import DataLoader
+from thinx.core.preprocessor import Preprocessor
+from thinx.core.explainer import Explainer
+from thinx.core.evaluation import Evaluator
+from thinx.core.utils import set_global_seed
+from thinx.core.data_loader import DataLoader
 from goodpoints import compress
-from thinX.core.utils import CC18_ALL, CTR23_ALL
+from thinx.core.utils import CC18_ALL, CTR23_ALL
 import argparse
 import hashlib
 import math

@@ -1,11 +1,11 @@
 import os
 import sys
 import numpy as np
-from thinX.core.explainer import Explainer
+from thinx.core.explainer import Explainer
 import argparse
-from thinX.core.utils import set_global_seed
-from thinX.core.data_loader import DataLoader
-from thinX.core.utils import CC18_ALL, CTR23_ALL
+from thinx.core.utils import set_global_seed
+from thinx.core.data_loader import DataLoader
+from thinx.core.utils import CC18_ALL, CTR23_ALL
 
 sys.stdout.reconfigure(line_buffering=True)
 

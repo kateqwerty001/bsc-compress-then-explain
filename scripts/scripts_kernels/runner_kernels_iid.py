@@ -3,7 +3,7 @@
 #  SHAP & SAGE EXPLAINERS ON ANN AND XGBOOST MODELS - KERNEL THINNING AND IID SAMPLING
 # ============================================================
 import os
-from thinX.core.utils import CC18_SMALL, CTR23_SMALL
+from thinx.core.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
 n_repeats = 10
