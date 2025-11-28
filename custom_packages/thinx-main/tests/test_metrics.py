@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from thinX.core.metrics import (
+from thinx.core.metrics import (
     compute_mae,
     compute_mmd,
     top_k_score,

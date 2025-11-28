@@ -1,7 +1,7 @@
 def test_imports():
-    import thinX
-    from thinX.core import metrics
+    import thinx
+    from thinx.core import metrics
 
 def test_version_attr_exists():
-    import thinX
-    assert hasattr(thinX, "__package__")
+    import thinx
+    assert hasattr(thinx, "__package__")

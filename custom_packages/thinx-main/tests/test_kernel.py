@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from unittest.mock import patch
-from thinX.core import kernel
+from thinx.core import kernel
 
 
 def test_gaussian_kernel_params():

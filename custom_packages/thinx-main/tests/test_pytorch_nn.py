@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import torch
-from thinX.core.pytorch_ann import BasicNeuralNetwork, PyTorchANN
+from thinx.core.pytorch_nn import BasicNeuralNetwork, PyTorchNN
 
 def test_basic_network_forward_shape():
     n_in, n_out = 4, 3
@@ -32,7 +32,7 @@ def _toy_regression(n=40, d=3, seed=2):
 
 def test_ann_classification_fit_predict_and_proba_shapes():
     X, y = _toy_classification(n=60, d=6)
-    model = PyTorchANN(task_type="classification", epochs=5, lr=1e-3, batch_size=16, random_state=42)
+    model = PyTorchNN(task_type="classification", epochs=5, lr=1e-3, batch_size=16, random_state=42)
     model.fit(X, y)
 
     # predict
@@ -49,7 +49,7 @@ def test_ann_classification_fit_predict_and_proba_shapes():
 def test_ann_multiclass_output_dim_matches_unique_y():
     X, y = _toy_multiclass()
     n_classes = len(np.unique(y))
-    model = PyTorchANN(task_type="classification", epochs=5, lr=1e-3, batch_size=16, random_state=7)
+    model = PyTorchNN(task_type="classification", epochs=5, lr=1e-3, batch_size=16, random_state=7)
     model.fit(X, y)
 
     probs = model.predict_proba(X[:8])
@@ -58,7 +58,7 @@ def test_ann_multiclass_output_dim_matches_unique_y():
 
 def test_ann_regression_fit_predict_shape_and_dtype():
     X, y = _toy_regression()
-    model = PyTorchANN(task_type="regression", epochs=5, lr=1e-3, batch_size=16, random_state=11)
+    model = PyTorchNN(task_type="regression", epochs=5, lr=1e-3, batch_size=16, random_state=11)
     model.fit(X, y)
 
     preds = model.predict(X[:7])
@@ -67,20 +67,20 @@ def test_ann_regression_fit_predict_shape_and_dtype():
 
 def test_predict_before_fit_raises():
     X, _ = _toy_classification(n=10, d=3)
-    model = PyTorchANN(task_type="classification", epochs=1)
+    model = PyTorchNN(task_type="classification", epochs=1)
     with pytest.raises(RuntimeError):
         model.predict(X)
 
 def test_predict_proba_not_available_for_regression():
     X, y = _toy_regression()
-    model = PyTorchANN(task_type="regression", epochs=1)
+    model = PyTorchNN(task_type="regression", epochs=1)
     model.fit(X, y)
     with pytest.raises(AttributeError):
         model.predict_proba(X)
 
 def test_invalid_task_type_raises_on_fit():
     X, y = _toy_classification()
-    model = PyTorchANN(task_type="unknown", epochs=1)
+    model = PyTorchNN(task_type="unknown", epochs=1)
     with pytest.raises(ValueError):
         model.fit(X, y)
 
@@ -104,7 +104,7 @@ def reg_data():
 
 def test_classification_improves_over_chance(cls_data):
     Xtr, ytr, Xte, yte = cls_data
-    ann = PyTorchANN(
+    ann = PyTorchNN(
         task_type="classification",
         epochs=20
     )
@@ -115,7 +115,7 @@ def test_classification_improves_over_chance(cls_data):
 
 def test_predict_requires_fit(cls_data):
     Xtr, ytr, Xte, _ = cls_data
-    ann = PyTorchANN(task_type="classification", epochs=1)
+    ann = PyTorchNN(task_type="classification", epochs=1)
     with pytest.raises((AttributeError, RuntimeError, ValueError)):
         ann.predict(Xte)
     ann.fit(Xtr, ytr)
@@ -123,7 +123,7 @@ def test_predict_requires_fit(cls_data):
 
 def test_fit_predict_regression_shapes(reg_data):
     Xtr, ytr, Xte, yte = reg_data
-    ann = PyTorchANN(task_type="regression", epochs=8)
+    ann = PyTorchNN(task_type="regression", epochs=8)
     ann.fit(Xtr, ytr)
     preds = ann.predict(Xte)
     assert preds.shape == (len(Xte),)
@@ -131,7 +131,7 @@ def test_fit_predict_regression_shapes(reg_data):
 
 def test_regression_mse_reasonable(reg_data):
     Xtr, ytr, Xte, yte = reg_data
-    ann = PyTorchANN(task_type="regression", epochs=25)
+    ann = PyTorchNN(task_type="regression", epochs=25)
     ann.fit(Xtr, ytr)
     preds = ann.predict(Xte)
     mse = np.mean((preds - yte) ** 2)

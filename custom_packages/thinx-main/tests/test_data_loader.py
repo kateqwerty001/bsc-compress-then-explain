@@ -1,10 +1,10 @@
 import pytest
 import numpy as np
 import torch
-from thinX.core.data_loader import DataLoader
-from thinX.core.pytorch_ann import PyTorchANN
+from thinx.core.data_loader import DataLoader
+from thinx.core.pytorch_nn import PyTorchNN
 from xgboost import XGBClassifier, XGBRegressor
-from thinX.core.tabular_preprocessor import TabularPreprocessor
+from thinx.core.tabular_preprocessor import TabularPreprocessor
 
 # Use white_wine dataset (ID=44971) from OpenML
 OPENML_DATASET_ID = 44971
@@ -17,7 +17,7 @@ def loader():
 
 def test_get_model_ann_classification(loader):
     model = loader._get_model("ann", task_type="classification", random_state=0)
-    assert isinstance(model, PyTorchANN)
+    assert isinstance(model, PyTorchNN)
 
 
 def test_get_model_xgboost_classification(loader):
@@ -46,7 +46,7 @@ def test_load_from_openml_white_wine_ann(loader):
     assert X_train.shape[0] > 0
     assert X_test.shape[0] > 0
     assert X_train.shape[1] == X_test.shape[1]
-    assert isinstance(model, PyTorchANN)
+    assert isinstance(model, PyTorchNN)
     assert isinstance(preprocessor, TabularPreprocessor)
     assert y_train.shape[0] == X_train.shape[0]
     assert y_test.shape[0] == X_test.shape[0]

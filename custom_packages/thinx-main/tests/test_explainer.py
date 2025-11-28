@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 import torch
-from thinX.core.explainer import Explainer
-from thinX.core.pytorch_ann import PyTorchANN, BasicNeuralNetwork
+from thinx.core.explainer import Explainer
+from thinx.core.pytorch_nn import PyTorchNN, BasicNeuralNetwork
 
 class DummyClsModel:
     def predict_proba(self, X):
@@ -165,7 +165,7 @@ def test_expected_gradients_requires_pytorchann():
         e._explain_expected_gradients(Xb, Xf, n_jobs=2)
 
 def test_expected_gradients_returns_tensor_and_time(monkeypatch):
-    ann = PyTorchANN(task_type="classification", epochs=1, batch_size=2, random_state=0)
+    ann = PyTorchNN(task_type="classification", epochs=1, batch_size=2, random_state=0)
     ann.model_ = BasicNeuralNetwork(n_inputs=3, n_outputs=2)
     Xb = np.random.randn(6, 3)
     Xf = np.random.randn(5, 3)

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from thinX.core.preprocessor import Compressor, Preprocessor
+from thinx.core.preprocessor import Compressor, Preprocessor
 
 class DummyModel:
     def __init__(self):
