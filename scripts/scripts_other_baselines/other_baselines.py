@@ -55,6 +55,10 @@ def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_for
                     target_size=target_size, 
                     grad_type=b'gaussian'
                 )
+            elif compression_method == "influence":
+                X_comp, y_comp, idx_comp, t_comp, _ = pre.preprocess(
+                    target_size=target_size
+                )
             else:
                 X_comp, y_comp, idx_comp, t_comp = pre.preprocess(
                     target_size=target_size
