@@ -10,6 +10,7 @@ from arfpy import arf as arf_mod
 import pandas as pd
 from stein_thinning.thinning import thin
 from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import StandardScaler
 
 
 class Compressor:
@@ -183,10 +184,10 @@ class Compressor:
         influence_model = CgInfluence(
             model,
             loss_fn,
-            regularization=1e-3,
-            rtol=1e-7,
-            atol=1e-7,
-            solve_simultaneously=True
+            # regularization=1e-3,
+            # rtol=1e-7,
+            # atol=1e-7,
+            # solve_simultaneously=True
         ).fit(train_loader)
 
         # --- Self-influence: influence of each point on all others ---
@@ -302,17 +303,25 @@ class Preprocessor:
         self.compression_method = compression_method
         self.seed = seed
 
-    def _data_with_predictions(self) -> Tuple[np.ndarray, np.ndarray]:
+    def _data_with_predictions(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Augments the feature matrix with model prediction probabilities.
+        Augments X with model predictions/probabilities if available.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]:
-            - Augmented feature matrix with predicted probabilities appended.
-            - Array of predicted probabilities.
+            X_aug: Feature matrix with predictions/probabilities appended
+            preds: Original predictions/probabilities
         """
-        preds = self.model.predict_proba(self.X)
+        try:
+            preds = self.model.predict_proba(self.X)
+        except AttributeError:
+            try:
+                preds = self.model.predict(self.X)
+            except AttributeError:
+                raise AttributeError("Model has neither predict_proba nor predict method.")
+
+        preds = np.array(preds).reshape(len(preds), -1)
         X_aug = np.concatenate([self.X, preds], axis=1)
+
         return X_aug, preds
 
     def _dispatch_compression(
