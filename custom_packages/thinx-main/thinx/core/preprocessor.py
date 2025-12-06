@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from typing import Optional, Tuple, Union, List
 import time
@@ -11,7 +12,7 @@ from arfpy import arf as arf_mod
 import pandas as pd
 from stein_thinning.thinning import thin
 from sklearn.mixture import GaussianMixture
-from sklearn.preprocessing import StandardScaler
+from goodpoints import compress
 
 
 class Compressor:
@@ -479,19 +480,34 @@ class Preprocessor:
             classes = np.unique(y_pred_cls)
             for cls in classes:
                 mask = (y_pred_cls == cls)
-                X_pred = X_mod[mask]
-                y_pred = y_mod[mask]
-                ts_cls = None
-                if target_size is not None:
+                X_cur_class = X_mod[mask]
+                y_cur_class = y_mod[mask]
+
+                if self.compression_method != "kernel_thinning":
+                    # we can compress to any other size
                     share = max(1, int(round(target_size * (mask.sum() / len(self.X)))))
-                    ts_cls = share
+                    target_size_for_this_class = share
+
+                elif self.compression_method == "kernel_thinning":
+                    # we can compress only to powers of 2
+                    default_compression_size = int(math.sqrt(compress.largest_power_of_four(len(self.X))))
+                    compression_coeff = target_size / default_compression_size
+
+                    default_compression_size_for_this_class = int(math.sqrt(compress.largest_power_of_four(len(X_cur_class))))
+                    target_size_for_this_class = default_compression_size_for_this_class * compression_coeff
+
+                elif self.compression_method == "None":
+                    raise ValueError("No compression method specified.")
+
+                else:
+                    raise ValueError(f"Unknown compression method: {self.compression_method}")
 
                 result = self._dispatch_compression(
-                    X_pred,
-                    y_pred,
+                    X_cur_class,
+                    y_cur_class,
                     g=g,
                     num_bins=num_bins,
-                    target_size=ts_cls,
+                    target_size=target_size_for_this_class,
                     kernel=kernel,
                     delta=delta,
                     grad_type=grad_type
