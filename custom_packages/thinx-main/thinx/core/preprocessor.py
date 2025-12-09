@@ -143,6 +143,8 @@ class Compressor:
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
 
+
+
     def _influence_compression(
             self,
             target_size: int
@@ -163,7 +165,7 @@ class Compressor:
             - Compression time.
             - Influence matrix (object) computed by CgInfluence
         """
-        assert isinstance(self.model, PyTorchNN), "Expected PyTorchNN model"
+        assert isinstance(self.model, torch.nn.Module), "Expected PyTorch model"
         n = target_size
 
         # --- Basic compression to sqrt(n'): n' - the largest power of 4 <= number os samples ---
@@ -172,30 +174,16 @@ class Compressor:
             n = 2 ** x
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = self.model.model_.to(device)
+        model = self.model.to(device)
         model.eval()
 
         start = time.time()
 
         X_tensor = torch.tensor(self.X).float().to(device)
+        y_tensor = torch.tensor(self.y).long().to(device)
+        train_loader = DataLoader(TensorDataset(X_tensor, y_tensor), batch_size=128, shuffle=False)
 
-        with torch.no_grad():
-            sample_out = model(X_tensor[:1])
-        output_dim = sample_out.shape[1] if sample_out.ndim > 1 else 1
-
-        # --- Define the loss function based on the task
-        if output_dim == 1:
-            #  --- regression ---
-            loss_fn = torch.nn.MSELoss()
-            y_tensor = torch.tensor(self.y).float().to(device)
-        else:
-            # --- classification ---
-            loss_fn = torch.nn.CrossEntropyLoss()
-            y_tensor = torch.tensor(self.y).long().to(device)
-
-        generator = torch.Generator()
-        generator.manual_seed(self.seed)
-        train_loader = DataLoader(TensorDataset(X_tensor, y_tensor), batch_size=128, shuffle=True, generator=generator)
+        loss_fn = torch.nn.CrossEntropyLoss()
 
         influence_model = CgInfluence(
             model,
@@ -206,32 +194,14 @@ class Compressor:
             solve_simultaneously=True
         ).fit(train_loader)
 
-        # --- Self-influence: influence of each point on all others (using batches-due to the time limits)---
-        batch_size = 30
-        influence_avg_list = []
-
-        #  --- Go through all batches ---
-        for i in range(0, X_tensor.size(0), batch_size):
-            batch_X = X_tensor[i:i+batch_size]
-            batch_y = y_tensor[i:i+batch_size]
-
-            #  --- Calculate influences for current batch ---
-            inf_batch = influence_model.influences(
-                batch_X, batch_y,
-                X_tensor, y_tensor,
-                mode="up"
-            )
-
-            influence_avg_batch = inf_batch.abs().mean(axis=0)
-            influence_avg_list.append(influence_avg_batch)
-        
-        #  --- Find average for each sample over all batches  ---
-        influence_avg = torch.stack(influence_avg_list).mean(dim=0).cpu().numpy()
+        # --- Self-influence: influence of each point on all others ---
+        influence_matrix = influence_model.influences(X_tensor, y_tensor, X_tensor, y_tensor, mode="up")
+        influence_avg = influence_matrix.abs().mean(axis=0).cpu().numpy()  # one score per training point
 
         # --- Select top-K by average influence magnitude ---
         top_k_indices = influence_avg.argsort()[-n:]
         end = time.time()
-        return self.X[top_k_indices], self.y[top_k_indices], top_k_indices, end - start, influence_avg_list
+        return self.X[top_k_indices], self.y[top_k_indices], top_k_indices, end - start, influence_matrix
 
     def _arfpy_compression(
             self,
