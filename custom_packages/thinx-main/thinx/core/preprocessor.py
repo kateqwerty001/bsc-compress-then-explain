@@ -8,6 +8,9 @@ from thinx.core.pytorch_nn import PyTorchNN
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from pydvl.influence.torch import CgInfluence
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+from pydvl.influence.torch.util import NestedTorchCatAggregator
 from arfpy import arf as arf_mod
 import pandas as pd
 from stein_thinning.thinning import thin
@@ -173,33 +176,66 @@ class Compressor:
             x = int(np.floor(np.log2(np.sqrt(self.X.shape[0]))))
             n = 2 ** x
 
+        # --- Set device ---
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        model = self.model.to(device)
-        model.eval()
+        self.model = self.model.model_.to(device)
+        self.model.eval()
 
         start = time.time()
 
-        X_tensor = torch.tensor(self.X).float().to(device)
-        y_tensor = torch.tensor(self.y).long().to(device)
-        train_loader = DataLoader(TensorDataset(X_tensor, y_tensor), batch_size=128, shuffle=False)
+        # --- Convert test data to torch tensors and move to device ---
+        X_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
 
-        loss_fn = torch.nn.CrossEntropyLoss()
+        # --- Determine model output size to select appropriate loss ---
+        with torch.no_grad():
+            sample_out = model(X_tensor[:1])
 
-        influence_model = CgInfluence(
-            model,
+        output_dim = sample_out.shape[1] if sample_out.ndim > 1 else 1
+
+        # --- Select loss function based on task type ---
+        if output_dim == 1:
+            loss_fn = torch.nn.MSELoss()  # regression task
+            y_tensor = torch.tensor(y_test, dtype=torch.float32).to(device)
+        else:
+            loss_fn = torch.nn.CrossEntropyLoss()  # classification task
+            y_tensor = torch.tensor(y_test, dtype=torch.long).to(device)
+
+        # --- Create DataLoaders for self-influence computation ---
+        batch_size = 20
+        dataset = TensorDataset(X_tensor, y_tensor)
+        g = torch.Generator()
+        g.manual_seed(self.seed)
+        train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=g)
+        test_loader = DataLoader(dataset, batch_size=batch_size)
+
+        # --- Initialize the influence function model ---
+        infl_model = CgInfluence(
+            self.model,
             loss_fn,
-            regularization=1e-3,
-            rtol=1e-7,
-            atol=1e-7,
+            regularization=0.01,
             solve_simultaneously=True
-        ).fit(train_loader)
+        )
+        # Fit the model using the same dataset for train (self-influence)
+        infl_model = infl_model.fit(train_loader)
 
-        # --- Self-influence: influence of each point on all others ---
-        influence_matrix = influence_model.influences(X_tensor, y_tensor, X_tensor, y_tensor, mode="up")
-        influence_avg = influence_matrix.abs().mean(axis=0).cpu().numpy()  # one score per training point
+        # --- Sequential influence calculator (processes batches sequentially) ---
+        infl_calc = SequentialInfluenceCalculator(infl_model)
+        lazy_influences = infl_calc.influences(test_loader, train_loader)
 
-        # --- Select top-K by average influence magnitude ---
-        top_k_indices = influence_avg.argsort()[-n:]
+        # --- Compute the full influence matrix (size: n_test x n_test) ---
+        # NestedTorchCatAggregator concatenates batches into one tensor
+        influence_matrix = lazy_influences.compute(aggregator=NestedTorchCatAggregator())
+
+        infl_np = influence_matrix.cpu().numpy()
+
+        # Zero out diagonal (self-influence)
+        np.fill_diagonal(infl_np, 0.0)
+
+        # Sum of absolute influence on all other points
+        self_influence_scores = np.abs(infl_np).sum(axis=1)
+
+        # Select n most representative points (lowest total absolute influence)
+        top_k_indices = np.argsort(self_influence_scores)[:n]
         end = time.time()
         return self.X[top_k_indices], self.y[top_k_indices], top_k_indices, end - start, influence_matrix
 
