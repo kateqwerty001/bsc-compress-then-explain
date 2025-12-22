@@ -11,6 +11,7 @@ from pydvl.influence.torch import CgInfluence
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from pydvl.influence.torch.util import NestedTorchCatAggregator
+from pydvl.influence import SequentialInfluenceCalculator
 from arfpy import arf as arf_mod
 import pandas as pd
 from stein_thinning.thinning import thin
@@ -168,7 +169,7 @@ class Compressor:
             - Compression time.
             - Influence matrix (object) computed by CgInfluence
         """
-        assert isinstance(self.model, torch.nn.Module), "Expected PyTorch model"
+        assert isinstance(self.model, PyTorchNN), "Expected PyTorchNN model"
         n = target_size
 
         # --- Basic compression to sqrt(n'): n' - the largest power of 4 <= number os samples ---
@@ -184,36 +185,39 @@ class Compressor:
         start = time.time()
 
         # --- Convert test data to torch tensors and move to device ---
-        X_tensor = torch.tensor(X_test, dtype=torch.float32).to(device)
+        X_tensor = torch.tensor(self.X, dtype=torch.float32).to(device)
 
         # --- Determine model output size to select appropriate loss ---
         with torch.no_grad():
-            sample_out = model(X_tensor[:1])
+            sample_out = self.model(X_tensor[:1])
 
         output_dim = sample_out.shape[1] if sample_out.ndim > 1 else 1
 
         # --- Select loss function based on task type ---
         if output_dim == 1:
-            loss_fn = torch.nn.MSELoss()  # regression task
-            y_tensor = torch.tensor(y_test, dtype=torch.float32).to(device)
+            print("Regression identified")
+            loss_fn = torch.nn.L1Loss()  # regression task
+            y_tensor = torch.tensor(self.y, dtype=torch.float32).to(device)
         else:
+            print("Classification identified")
             loss_fn = torch.nn.CrossEntropyLoss()  # classification task
-            y_tensor = torch.tensor(y_test, dtype=torch.long).to(device)
+            y_tensor = torch.tensor(self.y, dtype=torch.long).to(device)
 
         # --- Create DataLoaders for self-influence computation ---
-        batch_size = 20
+        batch_size = 1000
         dataset = TensorDataset(X_tensor, y_tensor)
         g = torch.Generator()
         g.manual_seed(self.seed)
         train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=g)
-        test_loader = DataLoader(dataset, batch_size=batch_size)
+        test_loader = DataLoader(dataset, batch_size=batch_size, shuffle = False)
 
         # --- Initialize the influence function model ---
         infl_model = CgInfluence(
             self.model,
             loss_fn,
-            regularization=0.01,
-            solve_simultaneously=True
+            solve_simultaneously=True, 
+            regularization = 0.9, 
+            precompute_grad = True
         )
         # Fit the model using the same dataset for train (self-influence)
         infl_model = infl_model.fit(train_loader)
@@ -232,10 +236,20 @@ class Compressor:
         np.fill_diagonal(infl_np, 0.0)
 
         # Sum of absolute influence on all other points
-        self_influence_scores = np.abs(infl_np).sum(axis=1)
+        scores = np.abs(infl_np).sum(axis=1)
+        scores = scores / scores.max()
 
-        # Select n most representative points (lowest total absolute influence)
-        top_k_indices = np.argsort(self_influence_scores)[:n]
+        # penalize extreme influence
+        weights = np.exp(-scores)
+
+        # sample proportionally
+        rng = np.random.default_rng(self.seed)
+        top_k_indices = rng.choice(
+            np.arange(len(scores)),
+            size=n,
+            replace=False,
+            p=weights / weights.sum(), 
+        )
         end = time.time()
         return self.X[top_k_indices], self.y[top_k_indices], top_k_indices, end - start, influence_matrix
 
@@ -258,6 +272,14 @@ class Compressor:
             - Row indices (indices) in the original X used in the sample.
             - Compression time.
         """
+        def get_arf_params(n_samples: int):
+            if n_samples < 5000:
+                return dict(num_trees=40, max_iters=15, min_node_size=5)
+            elif n_samples < 15000:
+                return dict(num_trees=30, max_iters=10, min_node_size=5)
+            else:
+                return dict(num_trees=25, max_iters=10, min_node_size=10)
+
         n = target_size
 
         # --- Basic compression to sqrt(n'): n' - the largest power of 4 <= number os samples ---
@@ -267,18 +289,33 @@ class Compressor:
 
         start = time.time()
         df = pd.DataFrame(self.X, columns=[f"feat_{i}" for i in range(self.X.shape[1])])
-        df["label"] = pd.Categorical(self.y)
+        if np.issubdtype(self.y.dtype, np.integer):
+            # classification
+            df["label"] = self.y.astype(int)
+        else:
+            # regression
+            df["label"] = self.y.astype(float)
 
-        model = arf_mod.arf(x=df)
+        params = get_arf_params(self.X.shape[0])
+        model = arf_mod.arf(
+            x=df,
+            num_trees=params['num_trees'],
+            max_iters=params['max_iters'],
+            delta=0.01,
+            early_stop=True,
+            verbose=False,
+            min_node_size=params['min_node_size']
+        )
         model.forde()
         df_gen = model.forge(n=n)
 
         X_gen = df_gen.drop(columns=["label"]).to_numpy()
-        y_gen = df_gen["label"].astype(int).to_numpy()
+        y_gen = df_gen["label"].astype(self.y.dtype).to_numpy()
 
         end = time.time()
 
         indices = np.full(shape=(n,), fill_value=-1, dtype=int)
+
         return X_gen, y_gen, indices, end - start
 
     def _iid_sampling(
