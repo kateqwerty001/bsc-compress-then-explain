@@ -2,9 +2,9 @@ import math
 import numpy as np
 from typing import Optional, Tuple, Union, List
 import time
-from thinx.core.thinx_compress import thinx_compress
-from thinx.core.kernel import resolve_kernel_params
-from thinx.core.pytorch_nn import PyTorchNN
+from thinx.thinx_compress import thinx_compress
+from thinx.kernel import resolve_kernel_params
+from thinx.pytorch_nn import PyTorchNN
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 from pydvl.influence.torch import CgInfluence

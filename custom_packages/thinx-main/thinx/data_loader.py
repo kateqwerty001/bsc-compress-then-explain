@@ -2,9 +2,9 @@ import numpy as np
 import openml
 import torch
 from typing import Union, Tuple, Optional
-from thinx.core.pytorch_nn import PyTorchNN
-from thinx.core.tabular_preprocessor import TabularPreprocessor
-from thinx.core.utils import CC18_ALL, CTR23_ALL
+from thinx.pytorch_nn import PyTorchNN
+from thinx.tabular_preprocessor import TabularPreprocessor
+from thinx.utils import CC18_ALL, CTR23_ALL
 from numpy import ndarray
 from openxai.model import LoadModel, ReturnLoaders
 from sklearn.model_selection import train_test_split

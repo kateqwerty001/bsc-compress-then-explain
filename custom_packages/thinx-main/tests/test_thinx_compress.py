@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from thinx.core.thinx_compress import thinx_compress
+from thinx.thinx_compress import thinx_compress
 from goodpoints import compressc, kt, compress
 
 

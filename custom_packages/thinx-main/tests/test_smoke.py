@@ -1,6 +1,6 @@
 def test_imports():
     import thinx
-    from thinx.core import metrics
+    from thinx import metrics
 
 def test_version_attr_exists():
     import thinx

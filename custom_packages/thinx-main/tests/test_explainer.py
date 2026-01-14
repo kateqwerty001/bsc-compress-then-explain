@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 import torch
-from thinx.core.explainer import Explainer
-from thinx.core.pytorch_nn import PyTorchNN, BasicNeuralNetwork
+from thinx.explainer import Explainer
+from thinx.pytorch_nn import PyTorchNN, BasicNeuralNetwork
 
 class DummyClsModel:
     def predict_proba(self, X):

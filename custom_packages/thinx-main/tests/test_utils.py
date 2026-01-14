@@ -3,7 +3,7 @@ import pytest
 import torch
 import os
 import random
-from thinx.core import utils
+from thinx import utils
 
 
 def test_benchmark_lists_are_valid():

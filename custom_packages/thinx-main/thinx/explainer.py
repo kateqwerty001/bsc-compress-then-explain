@@ -7,11 +7,11 @@ import sage
 import torch
 import joblib
 import captum
-from thinx.core.pytorch_nn import PyTorchNN
+from thinx.pytorch_nn import PyTorchNN
 import shapiq
 from torch.utils.data import DataLoader, TensorDataset
 from pydvl.influence.torch import CgInfluence
-from thinx.core.utils import set_global_seed
+from thinx.utils import set_global_seed
 
 try:
     if hasattr(sys.stdout, "reconfigure"):

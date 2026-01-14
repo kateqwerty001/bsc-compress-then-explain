@@ -1,10 +1,10 @@
 import pytest
 import numpy as np
 import torch
-from thinx.core.data_loader import DataLoader
-from thinx.core.pytorch_nn import PyTorchNN
+from thinx.data_loader import DataLoader
+from thinx.pytorch_nn import PyTorchNN
 from xgboost import XGBClassifier, XGBRegressor
-from thinx.core.tabular_preprocessor import TabularPreprocessor
+from thinx.tabular_preprocessor import TabularPreprocessor
 
 # Use white_wine dataset (ID=44971) from OpenML
 OPENML_DATASET_ID = 44971

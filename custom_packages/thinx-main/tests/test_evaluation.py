@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from thinx.core.evaluation import Evaluator
+from thinx.evaluation import Evaluator
 
 @pytest.fixture
 def ground_truth():

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import torch
-from thinx.core.pytorch_nn import BasicNeuralNetwork, PyTorchNN
+from thinx.pytorch_nn import BasicNeuralNetwork, PyTorchNN
 
 def test_basic_network_forward_shape():
     n_in, n_out = 4, 3
