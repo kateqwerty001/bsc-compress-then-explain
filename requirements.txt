@@ -1,14 +1,14 @@
 # Core dependencies for experiment reproduction
-openml==0.15.1
-scipy==1.13.0
-torch==2.7.1
-xgboost==3.1.0
-pyDVL==0.10.0
-distributed==2025.9.0
-zarr==2.18.3
-arfpy==0.1.1
-stein_thinning==0.2.0
-shapiq==1.3.2
+openml>=0.15.1
+scipy>=1.13.0
+torch>=2.7.1
+xgboost>=3.1.0
+pyDVL>=0.10.0
+distributed>=2025.9.0
+zarr>=2.18.3
+arfpy>=0.1.1
+stein_thinning>=0.2.0
+shapiq>=1.3.2
 
 openxai @ git+https://github.com/AI4LIFE-GROUP/OpenXAI.git@a18288620464250856b55234266a6d1dabb64656
 
