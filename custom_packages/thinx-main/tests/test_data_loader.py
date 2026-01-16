@@ -16,7 +16,7 @@ def loader():
 
 
 def test_get_model_ann_classification(loader):
-    model = loader._get_model("ann", task_type="classification", random_state=0)
+    model = loader._get_model("nn", task_type="classification", random_state=0)
     assert isinstance(model, PyTorchNN)
 
 
@@ -39,7 +39,7 @@ def test_get_model_invalid(loader):
 def test_load_from_openml_white_wine_ann(loader):
     dataset_name, X_train, y_train, X_test, y_test, model, preprocessor = loader.load_from_openml(
         dataset_id=OPENML_DATASET_ID,
-        model_name="ann",
+        model_name="nn",
         task_type="regression"
     )
     assert "white_wine" in dataset_name.lower()

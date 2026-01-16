@@ -92,19 +92,21 @@ def test_influence_compression(monkeypatch, small_data):
 
 def test_arfpy_compression(monkeypatch, small_data):
     X, y, model = small_data
-    class FakeARF:
-        def __init__(self, x): pass
+    target_size = 5
+    class FakeARFInstance:
+        def __init__(self, **kwargs): pass
         def forde(self): return None
         def forge(self, n):
             import pandas as pd
             d = {f"feat_{i}": np.random.randn(n) for i in range(X.shape[1])}
             d["label"] = np.random.randint(0, 2, n)
             return pd.DataFrame(d)
-    monkeypatch.setattr("thinx.preprocessor.arf_mod", type("M", (), {"arf": FakeARF}))
+    monkeypatch.setattr("thinx.preprocessor.arf_mod.arf", FakeARFInstance)
     comp = Compressor(X, y, model)
-    Xr, yr, idx, t = comp._arfpy_compression(target_size=5)
-    assert Xr.shape == (5, X.shape[1])
-    assert yr.shape[0] == 5
+    Xr, yr, idx, t = comp._arfpy_compression(target_size=target_size)
+    assert Xr.shape == (target_size, X.shape[1])
+    assert yr.shape[0] == target_size
+    assert np.all(idx == -1)
     assert isinstance(t, float)
 
 def test_iid_sampling(small_data):
@@ -117,7 +119,7 @@ def test_iid_sampling(small_data):
 
 def test_data_with_predictions(small_data):
     X, y, model = small_data
-    pre = Preprocessor(X, y, model, compression_method="iid")
+    pre = Preprocessor(X, y, model=model, compression_method="iid")
     Xaug, preds = pre._data_with_predictions()
     assert Xaug.shape[1] == X.shape[1] + preds.shape[1]
     assert model.called
@@ -125,7 +127,7 @@ def test_data_with_predictions(small_data):
 def test_dispatch_calls_correct_method(monkeypatch, small_data):
     X, y, model = small_data
     monkeypatch.setattr("thinx.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
-    comp = Preprocessor(X, y, model, compression_method="iid")
+    comp = Preprocessor(X, y, model=model, compression_method="iid")
     res = comp._dispatch_compression(X, y, 0, 0, 5, "gaussian", 0.5, None)
     assert len(res) == 4
 
@@ -136,8 +138,8 @@ def test_dispatch_each_method(monkeypatch, small_data, method):
         "thinx.preprocessor.resolve_kernel_params",
         lambda name, X, seed: (b"gaussian", np.ones(2))
     )
-    pre = Preprocessor(X, y, model, compression_method=method)
-    comp = Compressor(X, y, model)
+    pre = Preprocessor(X, y, model=model, compression_method=method)
+    comp = Compressor(X, y, model=model)
     for name in [
         "_kernel_thinning",
         "_stein_thinning",
@@ -152,14 +154,17 @@ def test_dispatch_each_method(monkeypatch, small_data, method):
 
 def test_dispatch_unknown_method_raises(small_data):
     X, y, model = small_data
-    pre = Preprocessor(X, y, model, compression_method="nope")
     with pytest.raises(ValueError):
-        pre._dispatch_compression(X, y, 0, 0, 0, "gaussian", 0.5, None)
+        Preprocessor(
+            X, y,
+            model=model,
+            compression_method="nope"
+        )
 
 def test_preprocess_none(monkeypatch, small_data):
     X, y, model = small_data
     monkeypatch.setattr("thinx.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
-    pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="none")
+    pre = Preprocessor(X, y, model=model, compression_method="iid", data_modification_method="none")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.2))
     Xr, yr, idx, t = pre.preprocess()
     assert Xr.shape[0] == 2
@@ -168,7 +173,7 @@ def test_preprocess_none(monkeypatch, small_data):
 def test_preprocess_predictions(monkeypatch, small_data):
     X, y, model = small_data
     monkeypatch.setattr("thinx.preprocessor.resolve_kernel_params", lambda k, X: (b"gaussian", np.ones(2)))
-    pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="predictions")
+    pre = Preprocessor(X, y, model=model, compression_method="iid", data_modification_method="predictions")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.2))
     Xr, yr, idx, t = pre.preprocess()
     assert Xr.shape[0] == 2
@@ -180,7 +185,7 @@ def test_preprocess_stratified(monkeypatch, small_data):
         "_dispatch_compression",
         lambda *a, **kw: (X[:1], y[:1], np.array([0]), 0.1)
     )
-    pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="stratified")
+    pre = Preprocessor(X, y, model=model, compression_method="iid", data_modification_method="stratified")
     monkeypatch.setattr(Preprocessor, "_dispatch_compression", lambda *a, **kw: (X[:2], y[:2], np.array([0, 1]), 0.1))
     Xr, yr, idx, t = pre.preprocess(target_size=4)
     assert len(Xr) > 0
@@ -188,9 +193,13 @@ def test_preprocess_stratified(monkeypatch, small_data):
 
 def test_preprocess_invalid_data_mod_method(small_data):
     X, y, model = small_data
-    pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="weird")
     with pytest.raises(ValueError):
-        pre.preprocess()
+        Preprocessor(
+            X, y,
+            model=model,
+            compression_method="iid",
+            data_modification_method="weird"
+        )
 
 def test_predictions_mode_calls_predict_proba(monkeypatch, small_data):
     X, y, model = small_data
@@ -204,7 +213,7 @@ def test_predictions_mode_calls_predict_proba(monkeypatch, small_data):
         Preprocessor, "_dispatch_compression",
         lambda *a, **kw: (a[1][:2], a[2][:2], np.array([0,1]), 0.02)
     )
-    pre = Preprocessor(X, y, model, compression_method="iid", data_modification_method="predictions")
+    pre = Preprocessor(X, y, model=model, compression_method="iid", data_modification_method="predictions")
     Xr, yr, idx, t = pre.preprocess()
 
     assert called["proba"]
@@ -212,7 +221,7 @@ def test_predictions_mode_calls_predict_proba(monkeypatch, small_data):
 
 def test_dispatch_returns_matrix_when_available(monkeypatch, small_data):
     X, y, model = small_data
-    pre = Preprocessor(X, y, model, compression_method="influence")
+    pre = Preprocessor(X, y, model=model, compression_method="influence")
     monkeypatch.setattr(
         Compressor, "_influence_compression",
         lambda *a, **kw: (X[:2], y[:2], np.array([0,1]), 0.1, np.ones((2, len(X))))
@@ -222,8 +231,8 @@ def test_dispatch_returns_matrix_when_available(monkeypatch, small_data):
 
 def test_iid_sampling_respects_seed(small_data):
     X, y, model = small_data
-    comp1 = Compressor(X, y, model, seed=123)
-    comp2 = Compressor(X, y, model, seed=123)
+    comp1 = Compressor(X, y, model=model, seed=123)
+    comp2 = Compressor(X, y, model=model, seed=123)
     X1, y1, idx1, _ = comp1._iid_sampling(target_size=4)
     X2, y2, idx2, _ = comp2._iid_sampling(target_size=4)
     assert np.array_equal(idx1, idx2)

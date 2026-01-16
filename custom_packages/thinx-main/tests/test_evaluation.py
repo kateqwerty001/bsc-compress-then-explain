@@ -13,8 +13,8 @@ def test_evaluate_explanation_basic(monkeypatch, ground_truth):
     gt_exp, gt_pts = ground_truth
     ev = Evaluator(gt_exp, gt_pts)
 
-    monkeypatch.setattr("thinx.core.evaluation.compute_mae", lambda a, b: 0.123)
-    monkeypatch.setattr("thinx.core.evaluation.top_k_score", lambda a, b, k=5: 0.9)
+    monkeypatch.setattr("thinx.evaluation.compute_mae", lambda a, b: 0.123)
+    monkeypatch.setattr("thinx.evaluation.top_k_score", lambda a, b, k=5: 0.9)
 
     explanation = np.array([[0.1, 0.1, 0.3],
                             [0.3, 0.5, 0.7]])
@@ -45,7 +45,7 @@ def test_evaluate_compression_basic(monkeypatch, ground_truth):
     gt_exp, gt_pts = ground_truth
     ev = Evaluator(gt_exp, gt_pts)
 
-    monkeypatch.setattr("thinx.core.evaluation.compute_mmd", lambda a, b: 0.456)
+    monkeypatch.setattr("thinx.evaluation.compute_mmd", lambda a, b: 0.456)
     compressed = np.array([[1, 2], [3, 4]])
 
     result = ev.evaluate_compression(compressed)

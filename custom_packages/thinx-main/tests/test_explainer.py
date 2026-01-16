@@ -52,7 +52,7 @@ def test_explain_shap_kernel_classification(monkeypatch):
             self.f = f
         def __call__(self, X, silent=True):
             return FakeShapOutput(np.ones((len(X), X.shape[1], 2)) * 0.5)
-    monkeypatch.setattr("thinx.core.explainer.shap", type("SHAP", (), {
+    monkeypatch.setattr("thinx.explainer.shap", type("SHAP", (), {
         "KernelExplainer": FakeKernelExplainer,
         "maskers": type("M", (), {"Independent": lambda *a, **k: None}),
         "PermutationExplainer": None,
@@ -77,7 +77,7 @@ def test_explain_shap_permutation_batched(monkeypatch):
         @staticmethod
         def Independent(X, max_samples=None):
             return None
-    monkeypatch.setattr("thinx.core.explainer.shap", type("SHAP", (), {
+    monkeypatch.setattr("thinx.explainer.shap", type("SHAP", (), {
         "PermutationExplainer": FakePermutationExplainer,
         "maskers": FakeMaskers,
         "KernelExplainer": None,
@@ -101,7 +101,7 @@ def test_explain_sage_kernel_and_permutation(monkeypatch):
             o = Obj()
             o.values = np.full((len(X), X.shape[1]), 0.5)
             return o
-    monkeypatch.setattr("thinx.core.explainer.sage", type("SAGE", (), {
+    monkeypatch.setattr("thinx.explainer.sage", type("SAGE", (), {
         "MarginalImputer": FakeImputer,
         "KernelEstimator": FakeEstimator,
         "PermutationEstimator": FakeEstimator
@@ -142,7 +142,7 @@ def test_explain_shapiq_returns_list_and_time(monkeypatch):
         def explain(self, x, budget, random_state):
             return FakeIV(len(x))
     monkeypatch.setattr(
-        "thinx.core.explainer.shapiq",
+        "thinx.explainer.shapiq",
         type("S", (), {
             "MarginalImputer": FakeImputer,
             "TabularExplainer": FakeExplainer
@@ -193,8 +193,8 @@ def test_expected_gradients_returns_tensor_and_time(monkeypatch):
         def wrapper(*args, **kwargs):
             return C(fn, args, kwargs)
         return wrapper
-    monkeypatch.setattr("thinx.core.explainer.captum", type("C", (), {"attr": type("A", (), {"IntegratedGradients": FakeIG})}))
-    monkeypatch.setattr("thinx.core.explainer.joblib", type("J", (), {"Parallel": FakeParallel, "delayed": delayed}))
+    monkeypatch.setattr("thinx.explainer.captum", type("C", (), {"attr": type("A", (), {"IntegratedGradients": FakeIG})}))
+    monkeypatch.setattr("thinx.explainer.joblib", type("J", (), {"Parallel": FakeParallel, "delayed": delayed}))
     e = Explainer(ann, "expected_gradients", "classification")
     vals, elapsed = e._explain_expected_gradients(X_background=Xb, X_foreground=Xf, n_jobs=2)
     assert isinstance(vals, torch.Tensor)
@@ -221,7 +221,7 @@ def test_influence_with_torch_module(monkeypatch):
         def fit(self, loader): return self
         def influences(self, X_test, y_test, X_train, y_train, mode="up"):
             return torch.zeros((len(X_test), len(X_train)))
-    monkeypatch.setattr("thinx.core.explainer.CgInfluence", FakeInf)
+    monkeypatch.setattr("thinx.explainer.CgInfluence", FakeInf)
     e = Explainer(TinyNet(), "influence", "classification")
     mat, elapsed = e._explain_influence(X_background=Xb, y_background=yb, X_foreground=Xf, y_foreground=yf)
     assert isinstance(mat, np.ndarray)

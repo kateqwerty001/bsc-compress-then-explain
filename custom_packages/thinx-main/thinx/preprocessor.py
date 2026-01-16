@@ -167,12 +167,17 @@ class Compressor:
             - Compression time.
             - Influence matrix (object) computed by CgInfluence
         """
-        assert isinstance(self.model, PyTorchNN), "Expected PyTorchNN model"
         n = target_size
 
         # --- Set device ---
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = self.model.model_.to(device)
+        if isinstance(self.model, PyTorchNN):
+            self.model = self.model.model_.to(device)
+        elif isinstance(self.model, torch.nn.Module):
+            self.model = self.model.to(device)
+        else:
+            raise ValueError("Model must be a PyTorchNN or torch.nn.Module instance.")
+        
         self.model.eval()
 
         start = time.time()

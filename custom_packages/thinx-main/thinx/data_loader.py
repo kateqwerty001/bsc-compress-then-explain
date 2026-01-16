@@ -38,7 +38,7 @@ class DataLoader:
         Raises:
             ValueError: If model_name is not 'nn'.
         """
-        if model_name != "nn":
+        if model_name != "ann":
             raise ValueError(f"Model '{model_name}' is not supported. Only 'nn' is available.")
 
         # --- Load data ---
