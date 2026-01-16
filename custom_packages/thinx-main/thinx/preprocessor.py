@@ -355,8 +355,8 @@ class Preprocessor:
             self,
             X: np.ndarray,
             y: np.ndarray,
-            model,
             compression_method: str,
+            model=None,
             data_modification_method: str = "none",
             seed: int = 0,
     ):
@@ -373,6 +373,22 @@ class Preprocessor:
                 Options: {"none", "predictions", "stratified"}.
             seed (int): Random seed.
         """
+        if X is None or y is None:
+            raise ValueError("X and y cannot be None.")
+
+        methods_requiring_model = {"influence"}
+        if compression_method in methods_requiring_model and model is None:
+            raise ValueError(f"Model must be provided for compression method '{compression_method}'.")
+        
+        available_compression_methods = {"kernel_thinning", "stein_thinning", "influence", "arfpy", "iid"}
+        if compression_method not in available_compression_methods:
+            raise ValueError(f"Unknown compression method: {compression_method}. "
+                             f"Available methods: {available_compression_methods}.")
+        
+        if data_modification_method not in {"none", "predictions", "stratified"}:
+            raise ValueError(f"Unknown data modification method: {data_modification_method}. "
+                             f"Available methods: {{'none', 'predictions', 'stratified'}}.")
+        
         self.X = X
         self.y = y
         self.model = model
