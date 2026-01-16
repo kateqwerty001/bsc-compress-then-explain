@@ -93,6 +93,8 @@ def thinx_compress(
         target_size = int(np.sqrt(largest_power_of_four(n)))
     if target_size < 1 or target_size > n:
         raise ValueError(f"target_size must be in [1, {n}] and must be a power of 2.")
+    if not (target_size > 0 and (target_size & (target_size - 1) == 0)):
+        raise ValueError(f"target_size ({target_size}) must be a power of 2.")
 
     nearest_pow_four = largest_power_of_four(n)
     sqrt_nearest_pow_four = int(math.sqrt(nearest_pow_four))

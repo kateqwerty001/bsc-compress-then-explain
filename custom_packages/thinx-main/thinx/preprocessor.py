@@ -147,8 +147,6 @@ class Compressor:
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
 
-
-
     def _influence_compression(
             self,
             target_size: int
@@ -171,11 +169,6 @@ class Compressor:
         """
         assert isinstance(self.model, PyTorchNN), "Expected PyTorchNN model"
         n = target_size
-
-        # --- Basic compression to sqrt(n'): n' - the largest power of 4 <= number os samples ---
-        if n is None:
-            x = int(np.floor(np.log2(np.sqrt(self.X.shape[0]))))
-            n = 2 ** x
 
         # --- Set device ---
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -282,11 +275,6 @@ class Compressor:
 
         n = target_size
 
-        # --- Basic compression to sqrt(n'): n' - the largest power of 4 <= number os samples ---
-        if n is None:
-            x = int(np.floor(np.log2(np.sqrt(self.X.shape[0]))))
-            n = 2 ** x
-
         start = time.time()
         df = pd.DataFrame(self.X, columns=[f"feat_{i}" for i in range(self.X.shape[1])])
         if np.issubdtype(self.y.dtype, np.integer):
@@ -335,14 +323,9 @@ class Compressor:
             - Row indices (indices) in the original X used in the sample.
             - Compression time.
         """
-        n = target_size
-
-        if n is None:
-            n = self.X.shape[0]
-
         start = time.time()
         rng = np.random.default_rng(self.seed)
-        indices = rng.choice(self.X.shape[0], size=n, replace=False)
+        indices = rng.choice(self.X.shape[0], size=target_size, replace=False)
         end = time.time()
         return self.X[indices], self.y[indices], indices, end - start
 
@@ -388,6 +371,9 @@ class Preprocessor:
         if data_modification_method not in {"none", "predictions", "stratified"}:
             raise ValueError(f"Unknown data modification method: {data_modification_method}. "
                              f"Available methods: {{'none', 'predictions', 'stratified'}}.")
+        
+        if data_modification_method in {"predictions", "stratified"} and model is None:
+            raise ValueError(f"Model must be provided for data modification method '{data_modification_method}'.")
         
         self.X = X
         self.y = y
@@ -512,6 +498,13 @@ class Preprocessor:
             ValueError: If the model does not implement `predict()` or `predict_proba()` in stratified mode.
             ValueError: If an unknown compression method is specified.
         """
+        if target_size is None:
+            print("No target_size specified, defaulting to sqrt(largest power of 4 <= n))")
+            target_size = int(np.sqrt(compress.largest_power_of_four(len(self.X))))
+
+        if target_size > len(self.X) or target_size <= 0:
+            raise ValueError("target_size must be positive and less than or equal to the number of samples in X.")
+
         if self.data_modification_method in {"none", "stratified"}:
             X_mod, y_mod = self.X, self.y
 
