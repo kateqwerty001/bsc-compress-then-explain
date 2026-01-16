@@ -27,19 +27,19 @@ class DataLoader:
 
         Args:
             dataset_name (str): Dataset name, e.g., "german".
-            model_name (str): Model name. Only 'ann' is supported.
+            model_name (str): Model name. Only 'nn' is supported.
 
         Returns:
             Tuple[np.ndarray, np.ndarray, torch.nn.Module]:
                 - X_test: Test samples.
                 - y_test: Test target values.
-                - model: Pretrained  ANN from OpenXAI.
+                - model: Pretrained  NN from OpenXAI.
 
         Raises:
-            ValueError: If model_name is not 'ann'.
+            ValueError: If model_name is not 'nn'.
         """
-        if model_name != "ann":
-            raise ValueError(f"Model '{model_name}' is not supported. Only 'ann' is available.")
+        if model_name != "nn":
+            raise ValueError(f"Model '{model_name}' is not supported. Only 'nn' is available.")
 
         # --- Load data ---
         _, loader_test = ReturnLoaders(data_name=dataset_name, download=True, batch_size=128)
@@ -59,7 +59,7 @@ class DataLoader:
         Initialize a model based on its name and task type - used for datasets from OpenML.
 
         Args:
-            model_name (str): 'ann' or 'xgboost'.
+            model_name (str): 'nn' or 'xgboost'.
             task_type (str): 'classification' or 'regression'.
             random_state (int): Random seed for reproducibility.
 
@@ -70,7 +70,7 @@ class DataLoader:
             ValueError: If model_name is not supported.
         """
         model_map = {
-            "ann": PyTorchNN(task_type=task_type, random_state=0),
+            "nn": PyTorchNN(task_type=task_type, random_state=0),
             "xgboost": (
                 XGBClassifier(n_estimators=200, random_state=random_state)
                 if task_type == "classification"
@@ -101,7 +101,7 @@ class DataLoader:
 
         Args:
             dataset_id (int): OpenML dataset ID.
-            model_name (str): 'ann' or 'xgboost'.
+            model_name (str): 'nn' or 'xgboost'.
             task_type (Optional[str]): 'classification' or 'regression'.
                 If None, inferred from dataset ID.
 
