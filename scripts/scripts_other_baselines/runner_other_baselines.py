@@ -20,7 +20,7 @@
 #  the explainer with Expected Gradients.
 # ====================================================================
 import os
-from thinx.core.utils import CC18_SMALL, CTR23_SMALL
+from thinx.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
 

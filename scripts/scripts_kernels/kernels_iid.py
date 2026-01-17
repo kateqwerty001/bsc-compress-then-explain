@@ -2,13 +2,8 @@ import numpy as np
 import pandas as pd
 import os
 import sys
-from thinx.core.preprocessor import Preprocessor
-from thinx.core.explainer import Explainer
-from thinx.core.evaluation import Evaluator
-from thinx.core.utils import set_global_seed
-from thinx.core.data_loader import DataLoader
 from goodpoints import compress
-from thinx.core.utils import CC18_ALL, CTR23_ALL
+import thinx, thinx.utils
 import argparse
 import hashlib
 import math
@@ -22,14 +17,14 @@ coefficients = [1/4, 1/2, 1, 2, 4] # compression coefficients to evaluate
 def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, seed, n_jobs, n_repeats):
     N_REPEATS = n_repeats
     basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test)))) # base size for compression for COMPRESS++
-    set_global_seed(seed)
+    thinx.utils.set_global_seed(seed)
 
     # Load the ground truth explanations, calculated previously: mean over the runs
     gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/ground_truth/package_metadata/openml/{dataset_name}/ground_truth/{explainer_name}_{strategy}_3_{model_name}.npz")
     gt_exp_values, gt_times = gt["exp_values"], gt["times"]
     mean_gt_exp_values = np.mean(gt_exp_values, axis=0)
 
-    evaluator = Evaluator(ground_truth_explanation=mean_gt_exp_values, ground_truth_points=X_test.copy())
+    evaluator = thinx.Evaluator(ground_truth_explanation=mean_gt_exp_values, ground_truth_points=X_test.copy())
 
     results = []
 
@@ -37,7 +32,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
     for i in range(N_REPEATS):
         for kernel in kernels:
             for target_size in [basic_size * coeff for coeff in coefficients]:
-                pre = Preprocessor(
+                pre = thinx.Preprocessor(
                     X=X_test.copy(),
                     y=y_test.copy(),
                     model=model,
@@ -54,7 +49,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                     kernel=kernel
                 )
 
-                explainer = Explainer(
+                explainer = thinx.Explainer(
                     model=model,
                     task_type=task_type,
                     explainer_name=explainer_name,
@@ -84,7 +79,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
     sizes = pd.DataFrame(results)["size"].unique()
     for i in sizes:
         for j in range(N_REPEATS):
-            pre = Preprocessor(
+            pre = thinx.Preprocessor(
                 X=X_test.copy(),
                 y=y_test.copy(),
                 model=model,
@@ -93,7 +88,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                 seed=seed + j + i
             )
             X_iid, y_iid, idx_iid, t_iid = pre.preprocess(target_size=i)
-            explainer = Explainer(
+            explainer = thinx.Explainer(
                 model=model,
                 task_type=task_type,
                 explainer_name=explainer_name,
@@ -137,9 +132,9 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, required=True)
     args = parser.parse_args()
 
-    set_global_seed(0)
+    thinx.utils.set_global_seed(0)
 
-    loader = DataLoader()
+    loader = thinx.DataLoader()
     dataset_name, X_train, y_train, X_test, y_test, model, _ = loader.load_from_openml(
         dataset_id=int(args.dataset_id),
         model_name=args.model_name
@@ -166,9 +161,9 @@ if __name__ == "__main__":
     # ---------------------------------------
 
     # determine task type
-    if int(args.dataset_id) in CC18_ALL:
+    if int(args.dataset_id) in thinx.utils.CC18_ALL:
         task_type = "classification"
-    elif int(args.dataset_id) in CTR23_ALL:
+    elif int(args.dataset_id) in thinx.utils.CTR23_ALL:
         task_type = "regression"
     else:
         raise ValueError(f"Dataset ID {args.dataset_id} not found in CC18 or CTR23 benchmarks.")

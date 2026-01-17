@@ -1,11 +1,8 @@
 import os
 import sys
 import numpy as np
-from thinx.core.explainer import Explainer
 import argparse
-from thinx.core.utils import set_global_seed
-from thinx.core.data_loader import DataLoader
-from thinx.core.utils import CC18_ALL, CTR23_ALL
+import thinx, thinx.utils
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -42,7 +39,7 @@ def run_explanations(
             X_background = X_test
         # ------------------------------------------------
 
-        explainer = Explainer(
+        explainer = thinx.Explainer(
             model=model,
             explainer_name=explainer_name,
             strategy=strategy,
@@ -82,9 +79,9 @@ if __name__ == "__main__":
     parser.add_argument("--n_jobs", type=int, required=True)
     args = parser.parse_args()
 
-    set_global_seed(0)
+    thinx.utils.set_global_seed(0)
 
-    loader = DataLoader()
+    loader = thinx.DataLoader()
     dataset_name, X_train, y_train, X_test, y_test, model, _ = loader.load_from_openml(
         dataset_id=int(args.dataset_id),
         model_name=args.model_name
@@ -111,9 +108,9 @@ if __name__ == "__main__":
     # ---------------------------------------
 
     # determine task type
-    if int(args.dataset_id) in CC18_ALL:
+    if int(args.dataset_id) in thinx.utils.CC18_ALL:
         task_type = "classification"
-    elif int(args.dataset_id) in CTR23_ALL:
+    elif int(args.dataset_id) in thinx.utils.CTR23_ALL:
         task_type = "regression"
     else:
         raise ValueError(f"Dataset ID {args.dataset_id} not found in CC18 or CTR23 benchmarks.")

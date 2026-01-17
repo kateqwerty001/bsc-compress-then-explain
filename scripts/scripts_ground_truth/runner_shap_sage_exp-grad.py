@@ -4,7 +4,7 @@
 #  [GROUND TRUTH]
 # ============================================================
 import os
-from thinx.core.utils import CC18_SMALL, CTR23_SMALL
+from thinx.utils import CC18_SMALL, CTR23_SMALL
 
 model_names = ["nn", "xgboost"]
 
@@ -68,7 +68,7 @@ for model_name in model_names:
 #  EXPECTED GRADIENTS ON NN MODELS [GROUND TRUTH]
 # ============================================================
 import os
-from thinx.core.utils import CC18_LARGE, CTR23_LARGE
+from thinx.utils import CC18_LARGE, CTR23_LARGE
 
 model_name = "nn"
 

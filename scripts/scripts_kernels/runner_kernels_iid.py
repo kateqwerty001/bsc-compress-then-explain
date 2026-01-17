@@ -6,7 +6,7 @@
 #  IID SAMPLING FOR THESE SIZES IS ALSO CALCULATED
 # =====================================================================
 import os
-from thinx.core.utils import CC18_SMALL, CTR23_SMALL
+from thinx.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
 n_repeats = 10

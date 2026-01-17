@@ -21,7 +21,7 @@
 #
 # ====================================================================
 import os
-from thinx.core.utils import CC18_SMALL, CTR23_SMALL, CC18_LARGE, CTR23_LARGE
+import thinx.utils
 
 seed = 42
 
@@ -47,7 +47,7 @@ for data_modification_method in data_modification_methods:
         for model_name in model_names:
             # for evaluation of Expected Gradients explainer on large datasets
             # for dataset_id in CC18_LARGE+CTR23_LARGE: 
-            for dataset_id in CC18_SMALL+CTR23_SMALL:
+            for dataset_id in thinx.utils.CC18_SMALL+thinx.utils.CTR23_SMALL:
                 dataset_name = f"{dataset_id}"
                 for explainer_name, strategy, n_jobs in explainers:
                     
@@ -56,7 +56,7 @@ for data_modification_method in data_modification_methods:
                     if compression_method != "kernel_thinning":
                         raise ValueError("This script is only for kernel thinning compression method and its custom modifications.")
                     
-                    if data_modification_method == "stratified" and dataset_id not in CC18_LARGE+CC18_SMALL:
+                    if data_modification_method == "stratified" and dataset_id not in thinx.utils.CC18_LARGE+thinx.utils.CC18_SMALL:
                         print(f"--> Skipping dataset {dataset_name} for stratified method (this method is only for classification datasets).")
                         continue
                     

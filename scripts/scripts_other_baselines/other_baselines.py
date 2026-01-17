@@ -3,13 +3,8 @@ import pandas as pd
 import os
 import time
 import sys
-from thinx.core.preprocessor import Preprocessor
-from thinx.core.explainer import Explainer
-from thinx.core.evaluation import Evaluator
-from thinx.core.utils import set_global_seed
-from thinx.core.data_loader import DataLoader
 from goodpoints import compress
-from thinx.core.utils import CC18_ALL, CTR23_ALL
+import thinx.utils, thinx
 import argparse
 import hashlib
 import math
@@ -25,14 +20,14 @@ def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_for
 
     N_REPEATS = 10 # for some datasets we had to do by one repeat only in one slurm job => 10 jobs in total for one dataset then
     basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test))))
-    set_global_seed(seed)
+    thinx.utils.set_global_seed(seed)
 
     gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/package_metadata/openml/{dataset_name}/ground_truth/{explainer_name}_{strategy}_3_{model_name}.npz")
     gt_exp_values, gt_times = gt["exp_values"], gt["times"]
 
     mean_gt_exp_values = np.mean(gt_exp_values, axis=0) # Average over repeats
 
-    evaluator = Evaluator(ground_truth_explanation=mean_gt_exp_values, ground_truth_points=X_test.copy())
+    evaluator = thinx.Evaluator(ground_truth_explanation=mean_gt_exp_values, ground_truth_points=X_test.copy())
 
     results = []
 
@@ -40,7 +35,7 @@ def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_for
     for i in range(N_REPEATS):
         for target_size in [basic_size * coeff for coeff in coefficients]:
             target_size = int(target_size)
-            pre = Preprocessor(
+            pre = thinx.Preprocessor(
                 X=X_test.copy(),
                 y=y_test.copy(),
                 model=model,
@@ -70,7 +65,7 @@ def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_for
                 print(f"[ERROR] Compression failed for target_size={target_size} on repeat {i+1}: {e}")
                 continue
 
-            explainer = Explainer(
+            explainer = thinx.Explainer(
                 model=model,
                 task_type=task_type,
                 explainer_name=explainer_name,
@@ -120,9 +115,9 @@ if __name__ == "__main__":
     if args.data_modification_method != "none" and args.compression_method != "kernel_thinning":
         raise ValueError("Data modification method can be used only with kernel thinning compression method.")
 
-    set_global_seed(0)
+    thinx.utils.set_global_seed(0)
 
-    loader = DataLoader()
+    loader = thinx.DataLoader()
     dataset_name, X_train, y_train, X_test, y_test, model, _ = loader.load_from_openml(
         dataset_id=int(args.dataset_id),
         model_name=args.model_name
@@ -149,9 +144,9 @@ if __name__ == "__main__":
     # ---------------------------------------
 
     # determine task type
-    if int(args.dataset_id) in CC18_ALL:
+    if int(args.dataset_id) in thinx.utils.CC18_ALL:
         task_type = "classification"
-    elif int(args.dataset_id) in CTR23_ALL:
+    elif int(args.dataset_id) in thinx.utils.CTR23_ALL:
         task_type = "regression"
     else:
         raise ValueError(f"Dataset ID {args.dataset_id} not found in CC18 or CTR23 benchmarks.")
