@@ -15,19 +15,19 @@ import math
 
 sys.stdout.reconfigure(line_buffering=True)
 
-kernels = ["gaussian", "sobolev", "inverse_multiquadric", "matern"]
-coefficients = [1/4, 1/2, 1, 2, 4]
+kernels = ["gaussian", "sobolev", "inverse_multiquadric", "matern"] # different kernels to evaluate
+coefficients = [1/4, 1/2, 1, 2, 4] # compression coefficients to evaluate
 
 
 def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, seed, n_jobs, n_repeats):
     N_REPEATS = n_repeats
-    basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test))))
+    basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test)))) # base size for compression for COMPRESS++
     set_global_seed(seed)
 
+    # Load the ground truth explanations, calculated previously: mean over the runs
     gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/ground_truth/package_metadata/openml/{dataset_name}/ground_truth/{explainer_name}_{strategy}_3_{model_name}.npz")
     gt_exp_values, gt_times = gt["exp_values"], gt["times"]
-
-    mean_gt_exp_values = np.mean(gt_exp_values, axis=0) # Average over repeats
+    mean_gt_exp_values = np.mean(gt_exp_values, axis=0)
 
     evaluator = Evaluator(ground_truth_explanation=mean_gt_exp_values, ground_truth_points=X_test.copy())
 
@@ -62,6 +62,7 @@ def run_pipeline_with_kernels_and_iid(dataset_name, X_test, y_test, X_foreground
                     seed=int(seed + i + target_size + int(hashlib.sha256(kernel.encode()).hexdigest(), 16) % (10**6))
                 )
 
+                # calculate explanations using the compressed set as background
                 exp_values, t_exp = explainer.explain(X_foreground=X_foreground, X_background=X_kt, y_foreground=y_foreground, n_jobs=n_jobs)
 
                 row = evaluator.evaluate_explanation(exp_values, t_exp, len(X_kt))
@@ -146,10 +147,10 @@ if __name__ == "__main__":
 
     print(f"\n[START] Preparing dataset: {dataset_name}")
 
-    if args.model_name == "ann":
+    if args.model_name == "nn":
         model.model_.eval()
 
-    # --- select fixed foreground points ---
+    # --- select fixed foreground points <= 4096 !!! the same as were used for ground truth explanations !!! ---
     if (
         (args.explainer_name == "shap" and args.strategy == "kernel")
         or (args.explainer_name == "expected_gradients" and args.strategy == "na")

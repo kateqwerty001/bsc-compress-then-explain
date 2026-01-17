@@ -1,14 +1,17 @@
-# ============================================================
+# =====================================================================
 #  SLURM JOB SUBMISSION SCRIPT — SMALL DATASETS (CC18 + CTR23)
-#  SHAP & SAGE EXPLAINERS ON ANN AND XGBOOST MODELS - KERNEL THINNING AND IID SAMPLING
-# ============================================================
+#  SHAP & SAGE EXPLAINERS ON NN AND XGBOOST MODELS - 
+#  KERNEL THINNING WITH 5 DIFFERENT COMPRESSION SIZES 
+#  AND WITH KERNELS: Gaussian, Inverse Multiquadric, Matérn, Sobolev
+#  IID SAMPLING FOR THESE SIZES IS ALSO CALCULATED
+# =====================================================================
 import os
 from thinx.core.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
 n_repeats = 10
 
-model_names = ["ann", "xgboost"]
+model_names = ["nn", "xgboost"]
 
 explainers = [
     ("shap", "kernel", 16),
@@ -17,7 +20,6 @@ explainers = [
 ]
 
 print("[START] Generating and submitting SLURM jobs for small datasets \n")
-
 
 for model_name in model_names:
     for dataset_id in CC18_SMALL + CTR23_SMALL:
@@ -65,15 +67,17 @@ for model_name in model_names:
 
 
 
-
-# ============================================================
+# =====================================================================
 #  SLURM JOB SUBMISSION SCRIPT — LARGE DATASETS (CC18 + CTR23)
-#  EXPECTED GRADIENTS ON ANN MODELS - KERNEL THINNING AND IID SAMPLING
-# ============================================================
+#  EXPECTED GRADIENTS EXPLAINER ON NN MODEL - 
+#  KERNEL THINNING WITH 5 DIFFERENT COMPRESSION SIZES 
+#  AND WITH KERNELS: Gaussian, Inverse Multiquadric, Matérn, Sobolev
+#  IID SAMPLING FOR THESE SIZES IS ALSO CALCULATED
+# =====================================================================
 import os
-from thinX.core.utils import CC18_LARGE, CTR23_LARGE
+from thinx.core.utils import CC18_LARGE, CTR23_LARGE
 
-model_name = "ann"
+model_name = "nn"
 
 explainers = [
     ("expected_gradients", "na", 16),
@@ -84,9 +88,7 @@ print("\n[START] Generating and submitting SLURM jobs for large datasets \n")
 for dataset_id in CC18_LARGE + CTR23_LARGE:
     dataset_name = f"{dataset_id}"
     for explainer_name, strategy, n_jobs in explainers:
-
-        if explainer_name == "expected_gradients":
-            mem_gb = "50G"
+        mem_gb = "100G"
 
         job_name = f"k_{dataset_name}_{explainer_name}_{model_name}"
         sh_file = f"run_{job_name}.sh"

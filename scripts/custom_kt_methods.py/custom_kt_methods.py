@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import os
-import time
 import sys
 from thinx.core.preprocessor import Preprocessor
 from thinx.core.explainer import Explainer
@@ -11,29 +10,33 @@ from thinx.core.data_loader import DataLoader
 from goodpoints import compress
 from thinx.core.utils import CC18_ALL, CTR23_ALL
 import argparse
-import hashlib
 import math
 
 sys.stdout.reconfigure(line_buffering=True)
 
-# target size coefficients for different baseline methods
-coefficients_basic = [1/4, 1/2, 1, 2, 4]
+coefficients_predictions = [1/4, 1/2, 1, 2, 4] # target size coefficients for predictions method
+coefficients_stratified = [1/16, 1/8, 1/4, 1/2, 1, 2, 4] # target size coefficients for stratified method
 
-def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, data_modification_method, compression_method, seed, n_jobs):
+
+def run_experiment_for_different_sizes(dataset_name, X_test, y_test, X_foreground, y_foreground, model, model_name, explainer_name, strategy, task_type, data_modification_method, compression_method, seed, n_jobs):
     print(f"[INFO] Running experiment for explainer: {explainer_name}, strategy: {strategy}, model: {model_name}, dataset: {dataset_name} - compression: {compression_method}, data modification: {data_modification_method}")
-    coefficients = coefficients_basic
-
-    N_REPEATS = 10 # for some datasets we had to do by one repeat only in one slurm job => 10 jobs in total for one dataset then
-    basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test))))
     set_global_seed(seed)
+    N_REPEATS = 10 # adjust to the slurm job time limit if needed
+    basic_size =int(math.sqrt(compress.largest_power_of_four(len(X_test))))
+    
+    if data_modification_method == "stratified":
+        coefficients = coefficients_stratified
+    elif data_modification_method == "predictions":
+        coefficients = coefficients_predictions
+    else:
+        raise ValueError(f"This script does not support data modification method: {data_modification_method}")
 
+    # load ground truth explanations
     gt = np.load(f"/mnt/evafs/faculty/home/kbokhan/bsc-compress-then-explain/experiments/package_metadata/openml/{dataset_name}/ground_truth/{explainer_name}_{strategy}_3_{model_name}.npz")
     gt_exp_values, gt_times = gt["exp_values"], gt["times"]
-
     mean_gt_exp_values = np.mean(gt_exp_values, axis=0) # Average over repeats
 
     evaluator = Evaluator(ground_truth_explanation=mean_gt_exp_values, ground_truth_points=X_test.copy())
-
     results = []
 
     print(f"[INFO] Running {explainer_name}-{strategy} ({compression_method}, {data_modification_method}) on dataset: {dataset_name}")
@@ -49,26 +52,13 @@ def run_experiment_for_5_sizes(dataset_name, X_test, y_test, X_foreground, y_for
                 seed=int(seed + i + target_size)
             )
             print(f"Repeat {i+1}/{N_REPEATS}, target size: {target_size}")
-            
-            try:
-                if compression_method == "stein_thinning":
-                    X_comp, y_comp, idx_comp, t_comp = pre.preprocess(
-                        target_size=target_size,
-                        grad_type=b'gaussian'
-                    )
-                elif compression_method == "influence":
-                    X_comp, y_comp, idx_comp, t_comp, _ = pre.preprocess(
-                        target_size=target_size
-                    )
-                else:
-                    X_comp, y_comp, idx_comp, t_comp = pre.preprocess(
-                        target_size=target_size
-                    )
-
-            except Exception as e:
-                # influence method can fail on a dataset due to numerical issues
-                print(f"[ERROR] Compression failed for target_size={target_size} on repeat {i+1}: {e}")
-                continue
+            _, _, idx_comp, t_comp = pre.preprocess(
+                target_size=target_size,
+                g=4,
+                num_bins=32,
+                kernel="gaussian"
+            )
+            X_comp, y_comp = X_test[idx_comp], y_test[idx_comp]
 
             explainer = Explainer(
                 model=model,
@@ -117,9 +107,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, required=True)
     args = parser.parse_args()
 
-    if args.data_modification_method != "none" and args.compression_method != "kernel_thinning":
-        raise ValueError("Data modification method can be used only with kernel thinning compression method.")
-
     set_global_seed(0)
 
     loader = DataLoader()
@@ -133,7 +120,7 @@ if __name__ == "__main__":
     if args.model_name == "nn":
         model.model_.eval()
 
-    # --- select fixed foreground points <= 4096 - !!! the same as in ground truth generation ---
+    # --- select fixed foreground points <= 4096 - !!! The same as in ground truth computation !!! ---
     if (
         (args.explainer_name == "shap" and args.strategy == "kernel")
         or (args.explainer_name == "expected_gradients" and args.strategy == "na")
@@ -157,7 +144,7 @@ if __name__ == "__main__":
         raise ValueError(f"Dataset ID {args.dataset_id} not found in CC18 or CTR23 benchmarks.")
 
     print(f"[INFO] Starting {args.explainer_name}-{args.strategy} for dataset: {dataset_name}")
-    run_experiment_for_5_sizes(
+    run_experiment_for_different_sizes(
         dataset_name=dataset_name,
         X_test=X_test, 
         y_test=y_test,
@@ -171,5 +158,5 @@ if __name__ == "__main__":
         data_modification_method=args.data_modification_method,
         compression_method=args.compression_method,
         seed=int(args.seed),
-        n_jobs=int(args.n_jobs)
+        n_jobs=int(args.n_jobs),
     )

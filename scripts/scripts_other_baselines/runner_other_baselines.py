@@ -1,14 +1,31 @@
-# ============================================================
-#  SLURM JOB SUBMISSION SCRIPT — SMALL DATASETS (CC18 + CTR23)
-#  SHAP & SAGE $ SHAP-IQ EXPLAINERS ON ANN AND XGBOOST MODELS 
-#  STEIN THINNING COMPRESSION
-# ============================================================
+# ====================================================================
+#  SLURM JOB SUBMISSION SCRIPT FOR EXPERIMENTS WITH DIFFERENT BASELINES 
+#  WITH DIFFERENT SIZES 
+#  
+#  - STEIN THINNING
+#  - ARF COMPRESSION
+#  - INFLUENCE-BASED COMPRESSION (only for NN models)
+# 
+#  1. SMALL DATASETS (CC18_SMALL + CTR23_SMALL) 
+#       -> SHAP & SAGE & SHAP-IQ EXPLAINERS 
+#       -> NN AND XGBOOST MODELS 
+# 
+#  2. LARGE DATASETS (CC18_LARGE + CTR23_LARGE)
+#       -> EXPECTED GRADIENTS EXPLAINER
+#       -> NN MODELS ONLY
+# 
+#  NOTE:
+#  The current configuration runs experiments on SMALL datasets.
+#  To switch to LARGE datasets, replace the dataset list and
+#  the explainer with Expected Gradients.
+# ====================================================================
 import os
 from thinx.core.utils import CC18_SMALL, CTR23_SMALL
 
 seed = 42
 
-model_names = ["ann", "xgboost"]
+# set a model
+model_names = ["nn", "xgboost"]
 
 explainers = [
     ("shap", "kernel", 16),
@@ -16,7 +33,12 @@ explainers = [
     ("shapiq", "kernel", 16),
 ]
 
-compression_methods = ["arfpy"]
+# In case we test on LARGE datasets and we want to run only expected gradients
+# explainers = [
+#     ("expected_gradients", "na", 16)
+# ]
+
+compression_methods = ["arfpy", "stein_thinning", "influence"] # influence works only for neural networks
 data_modification_method = ["none"]
 
 print("[START] Generating and submitting SLURM jobs for small datasets \n")
@@ -24,11 +46,14 @@ print("[START] Generating and submitting SLURM jobs for small datasets \n")
 for data_modification in data_modification_method:
     for compression_method in compression_methods:
         for model_name in model_names:
+            # change to CC18_LARGE + CTR23_LARGE to run on large datasets
             for dataset_id in CC18_SMALL + CTR23_SMALL:
                 dataset_name = f"{dataset_id}"
                 for explainer_name, strategy, n_jobs in explainers:
+                    if compression_method == "influence" and model_name != "nn":
+                        continue
                     
-                    mem_gb = "50G"
+                    mem_gb = "60G"
 
                     if compression_method == "influence":
                         prefix = "i"

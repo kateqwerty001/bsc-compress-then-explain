@@ -1,15 +1,16 @@
 # ============================================================
 #  SLURM JOB SUBMISSION SCRIPT — SMALL DATASETS (CC18 + CTR23)
-#  SHAP & SAGE EXPLAINERS ON ANN AND XGBOOST MODELS
+#  SHAP & SAGE & SHAP-IQ EXPLAINERS ON NN AND XGBOOST MODELS 
+#  [GROUND TRUTH]
 # ============================================================
 import os
 from thinx.core.utils import CC18_SMALL, CTR23_SMALL
 
-model_names = ["ann", "xgboost"]
+model_names = ["nn", "xgboost"]
 
 explainers = [
-    # ("shap", "kernel", 16),
-    # ("sage", "permutation", 16),
+    ("shap", "kernel", 16),
+    ("sage", "permutation", 16),
     ("shapiq", "kernel", 16),
 ]
 
@@ -20,8 +21,9 @@ for model_name in model_names:
         dataset_name = f"{dataset_id}"
         for explainer_name, strategy, n_jobs in explainers:
             
+            # some datasets require more memory
             if explainer_name == "sage":
-                mem_gb = "100G"
+                mem_gb = "120G"
             elif explainer_name == "shap" or explainer_name == "shapiq":
                 mem_gb = "100G"
 
@@ -59,14 +61,16 @@ for model_name in model_names:
             print(f"--> Submitted job: {job_name}")
 
 
+
+
 # ============================================================
 #  SLURM JOB SUBMISSION SCRIPT — LARGE DATASETS (CC18 + CTR23)
-#  EXPECTED GRADIENTS ON ANN MODELS
+#  EXPECTED GRADIENTS ON NN MODELS [GROUND TRUTH]
 # ============================================================
 import os
 from thinx.core.utils import CC18_LARGE, CTR23_LARGE
 
-model_name = "ann"
+model_name = "nn"
 
 explainers = [
     ("expected_gradients", "na", 16),
@@ -79,7 +83,7 @@ for dataset_id in CC18_LARGE + CTR23_LARGE:
     for explainer_name, strategy, n_jobs in explainers:
 
         if explainer_name == "expected_gradients":
-            mem_gb = "50G"
+            mem_gb = "100G"
 
         job_name = f"{dataset_name}_{explainer_name}_{model_name}"
         sh_file = f"run_{job_name}.sh"

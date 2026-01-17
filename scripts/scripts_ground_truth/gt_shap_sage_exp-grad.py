@@ -33,7 +33,7 @@ def run_explanations(
     for i in range(num_repeats):
         print(f"\n[INFO] Repeat {i + 1}")
 
-        # --- resample background points each repeat ---
+        # --- resample background points each repeat, if there are more than 5000 test samples ---
         rng_bg = np.random.default_rng(seed + i)
         if len(X_test) > 5000:
             ids_bg = rng_bg.choice(len(X_test), size=5000, replace=False)
@@ -92,10 +92,10 @@ if __name__ == "__main__":
 
     print(f"\n[START] Preparing dataset: {dataset_name}")
 
-    if args.model_name == "ann":
+    if args.model_name == "nn":
         model.model_.eval()
 
-    # --- select fixed foreground points ---
+    # --- select fixed foreground points <= 4096 samples ---
     if (
         (args.explainer_name == "shap" and args.strategy == "kernel")
         or (args.explainer_name == "expected_gradients" and args.strategy == "na")
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         ids_fg = rng_fg.choice(len(X_test), size=4096, replace=False)
         X_foreground = X_test[ids_fg]
         y_foreground = y_test[ids_fg]
-    else:
+    else: # case of SAGE Permutation or small test set
         X_foreground = X_test
         y_foreground = y_test
     # ---------------------------------------
